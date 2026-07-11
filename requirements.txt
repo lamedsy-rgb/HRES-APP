@@ -1,0 +1,10 @@
+customtkinter
+pandas
+numpy
+matplotlib
+requests
+pygad
+openpyxl
+pyinstaller
+tkintermapview
+pillow

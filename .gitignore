@@ -1,0 +1,33 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# PyInstaller & Build artifacts
+build/
+dist/
+*.spec
+
+# Local data, configuration & caches
+data_handlers/cache/
+.tutorial_done
+session.json
+scenarios.json
+app_error.log
+*.log
+
+# IDE & OS specific files
+.vscode/
+.idea/
+.project
+.pydevproject
+.settings/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+Thumbs.db

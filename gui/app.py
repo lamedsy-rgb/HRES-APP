@@ -212,12 +212,17 @@ class Application(ctk.CTk):
         logo_col = 2 if is_rtl else 0
         ctrl_col = 0 if is_rtl else 2
         
-        self.top_bar_frame = ctk.CTkFrame(self, height=65, corner_radius=0)
+        self.top_bar_frame = ctk.CTkFrame(self, height=68, corner_radius=0, fg_color=("#f8fafc", "#0a0a0f"))
         self.top_bar_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
         self.top_bar_frame.grid_rowconfigure(0, weight=1)
+        self.top_bar_frame.grid_rowconfigure(1, weight=0) # Separator row
         self.top_bar_frame.grid_columnconfigure(0, weight=0)
         self.top_bar_frame.grid_columnconfigure(1, weight=1) # Expands to center navigation
         self.top_bar_frame.grid_columnconfigure(2, weight=0)
+        
+        # Bottom Separator
+        separator = ctk.CTkFrame(self.top_bar_frame, height=1, fg_color=("#e2e8f0", "#1f1f27"))
+        separator.grid(row=1, column=0, columnspan=3, sticky="ew")
         
         # 1. Logo & Subtitle
         logo_frame = ctk.CTkFrame(self.top_bar_frame, fg_color="transparent")
@@ -227,7 +232,7 @@ class Application(ctk.CTk):
             logo_frame, 
             text=self.get_text("sidebar_logo"), 
             font=ctk.CTkFont(size=22, weight="bold"),
-            text_color="#1f538d"
+            text_color=("#1f538d", "#38bdf8")
         )
         logo_label.grid(row=0, column=0, sticky="w" if not is_rtl else "e")
         
@@ -235,7 +240,7 @@ class Application(ctk.CTk):
             logo_frame, 
             text=self.get_text("sidebar_subtitle"), 
             font=ctk.CTkFont(size=11, slant="italic"),
-            text_color="#888888"
+            text_color=("#64748b", "#94a3b8")
         )
         subtitle_label.grid(row=1, column=0, sticky="w" if not is_rtl else "e")
         
@@ -262,7 +267,12 @@ class Application(ctk.CTk):
             values=nav_values,
             command=self.on_nav_tab_changed,
             height=36,
-            font=ctk.CTkFont(size=12, weight="bold")
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=("#e2e8f0", "#131318"),
+            selected_color=("#1e293b", "#1f538d"),
+            selected_hover_color=("#0f172a", "#14375e"),
+            unselected_hover_color=("#cbd5e1", "#1e1e26"),
+            corner_radius=8
         )
         self.nav_segmented_btn.grid(row=0, column=1, padx=20, pady=10, sticky="")
         
@@ -284,9 +294,12 @@ class Application(ctk.CTk):
             ctrl_frame,
             text=self.get_text("save_session"),
             height=30,
-            width=100,
-            fg_color="#333333",
-            hover_color="#444444",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            border_color=("#cbd5e1", "#334155"),
+            text_color=("#334155", "#cbd5e1"),
+            hover_color=("#f1f5f9", "#1e293b"),
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self.save_session
         )
@@ -296,9 +309,12 @@ class Application(ctk.CTk):
             ctrl_frame,
             text=self.get_text("load_session"),
             height=30,
-            width=100,
-            fg_color="#333333",
-            hover_color="#444444",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            border_color=("#cbd5e1", "#334155"),
+            text_color=("#334155", "#cbd5e1"),
+            hover_color=("#f1f5f9", "#1e293b"),
             font=ctk.CTkFont(size=11, weight="bold"),
             command=self.load_session
         )
@@ -308,8 +324,12 @@ class Application(ctk.CTk):
         self.language_optionmenu = ctk.CTkOptionMenu(
             ctrl_frame,
             values=lang_values,
-            width=90,
+            width=95,
             height=30,
+            fg_color=("#ffffff", "#131318"),
+            button_color=("#cbd5e1", "#334155"),
+            button_hover_color=("#94a3b8", "#475569"),
+            text_color=("#334155", "#cbd5e1"),
             font=ctk.CTkFont(size=11),
             command=self.change_language
         )
@@ -322,6 +342,10 @@ class Application(ctk.CTk):
             values=["Dark", "Light"],
             width=80,
             height=30,
+            fg_color=("#ffffff", "#131318"),
+            button_color=("#cbd5e1", "#334155"),
+            button_hover_color=("#94a3b8", "#475569"),
+            text_color=("#334155", "#cbd5e1"),
             font=ctk.CTkFont(size=11),
             command=self.change_appearance_mode
         )

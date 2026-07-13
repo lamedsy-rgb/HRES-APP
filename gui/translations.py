@@ -12,10 +12,10 @@ TRANSLATIONS = {
         "load_session": "Charger Session",
         
         # Tabs
-        "tab_inputs": "Données d'Entrée",
-        "tab_opt": "Simulation & Optimisation",
-        "tab_results": "Résultats & Graphiques",
-        "tab_scenarios": "Comparatif de Scénarios",
+        "tab_inputs": "Données",
+        "tab_opt": "Optimisation",
+        "tab_results": "Résultats",
+        "tab_scenarios": "Comparatif",
         
         # Tab 1: Inputs
         "tab1_title": "Configuration & Données d'Entrée",
@@ -205,10 +205,10 @@ TRANSLATIONS = {
         "load_session": "Load Session",
         
         # Tabs
-        "tab_inputs": "Input Data",
-        "tab_opt": "Simulation & Optimization",
-        "tab_results": "Results & Charts",
-        "tab_scenarios": "Scenario Comparison",
+        "tab_inputs": "Inputs",
+        "tab_opt": "Optimization",
+        "tab_results": "Results",
+        "tab_scenarios": "Scenarios",
         
         # Tab 1: Inputs
         "tab1_title": "Configuration & Input Data",
@@ -398,10 +398,10 @@ TRANSLATIONS = {
         "load_session": "تحميل الجلسة",
         
         # Tabs
-        "tab_inputs": "بيانات المدخلات",
-        "tab_opt": "المحاكاة والتحسين",
-        "tab_results": "النتائج والرسومات",
-        "tab_scenarios": "مقارنة السيناريوهات",
+        "tab_inputs": "المدخلات",
+        "tab_opt": "التحسين",
+        "tab_results": "النتائج",
+        "tab_scenarios": "المقارنة",
         
         # Tab 1: Inputs
         "tab1_title": "التهيئة وبيانات المدخلات",

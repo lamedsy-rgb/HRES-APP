@@ -136,9 +136,9 @@ class Application(ctk.CTk):
         """Initializes weather, load, and simulation results with offline synthetic defaults."""
         try:
             logger.info("Génération de données par défaut au démarrage...")
-            # Default location: Senegal (14.5° N, -16.2° W)
+            # Default location: Nouakchott (18.0858° N, -15.9785° W)
             weather_handler = NASAWeatherDataHandler()
-            self.weather_df = weather_handler.generate_synthetic_weather(lat=14.5, year=2023)
+            self.weather_df = weather_handler.generate_synthetic_weather(lat=18.0858, year=2023)
             
             # Default village: 50 households, medium school, medium clinic
             self.load_df = generate_synthetic_load(
@@ -241,11 +241,11 @@ class Application(ctk.CTk):
         
         # 2. Navigation Tab Segmented Button
         nav_values = [
-            self.get_text("tab_inputs"),
-            self.get_text("tab_opt"),
-            self.get_text("tab_results"),
-            self.get_text("tab_scenarios"),
-            self.get_text("tab_help")
+            f"  {self.get_text('tab_inputs')}  ",
+            f"  {self.get_text('tab_opt')}  ",
+            f"  {self.get_text('tab_results')}  ",
+            f"  {self.get_text('tab_scenarios')}  ",
+            f"  {self.get_text('tab_help')}  "
         ]
         
         self.tab_key_map = {
@@ -268,7 +268,7 @@ class Application(ctk.CTk):
         
         # Set active selection
         active_label = self.get_text(self.tab_key_map.get(self.current_tab_name, "tab_inputs"))
-        self.nav_segmented_btn.set(active_label)
+        self.nav_segmented_btn.set(f"  {active_label}  ")
         
         # 3. Control Panel (Theme, Language, Sessions)
         ctrl_frame = ctk.CTkFrame(self.top_bar_frame, fg_color="transparent")
@@ -330,9 +330,10 @@ class Application(ctk.CTk):
 
     def on_nav_tab_changed(self, value):
         """Callback triggered when the segmented navigation button value changes."""
+        val_strip = value.strip()
         target_name = "Données d'Entrée"
         for name, key in self.tab_key_map.items():
-            if value == self.get_text(key):
+            if val_strip == self.get_text(key).strip():
                 target_name = name
                 break
         self.select_tab(target_name)
@@ -399,9 +400,9 @@ class Application(ctk.CTk):
         """Collects all UI input widget values to restore on language changes or session loading."""
         state = {}
         # Tab 1
-        try: state["input_segment"] = self.input_segmented_btn.get()
+        try: state["input_segment"] = self.input_segmented_btn.get().strip()
         except: pass
-        try: state["previs_segment"] = self.previs_segmented_btn.get()
+        try: state["previs_segment"] = self.previs_segmented_btn.get().strip()
         except: pass
         try: state["households"] = self.households_slider.get()
         except: pass
@@ -467,12 +468,13 @@ class Application(ctk.CTk):
         # Tab 1 segment and parameters
         try:
             if "input_segment" in state:
-                self.input_segmented_btn.set(state["input_segment"])
-                self.on_input_segment_changed(state["input_segment"])
+                seg_val = f"  {state['input_segment']}  "
+                self.input_segmented_btn.set(seg_val)
+                self.on_input_segment_changed(seg_val)
         except: pass
         try:
             if "previs_segment" in state:
-                self.previs_segmented_btn.set(state["previs_segment"])
+                self.previs_segmented_btn.set(f"  {state['previs_segment']}  ")
         except: pass
         try:
             if "households" in state: self.households_slider.set(state["households"])
@@ -725,8 +727,8 @@ class Application(ctk.CTk):
         # Sync the segmented button selection if it doesn't match
         if hasattr(self, "nav_segmented_btn") and hasattr(self, "tab_key_map"):
             active_label = self.get_text(self.tab_key_map.get(tab_name, "tab_inputs"))
-            if self.nav_segmented_btn.get() != active_label:
-                self.nav_segmented_btn.set(active_label)
+            if self.nav_segmented_btn.get().strip() != active_label.strip():
+                self.nav_segmented_btn.set(f"  {active_label}  ")
                 
         # Switch frames (always spans row 1, full width)
         for name, frame in self.tab_frames.items():
@@ -777,9 +779,9 @@ class Application(ctk.CTk):
         
         # Segmented Control at the top
         seg_values = [
-            self.get_text("seg_manual"),
-            self.get_text("seg_file"),
-            self.get_text("seg_geoloc")
+            f"  {self.get_text('seg_manual')}  ",
+            f"  {self.get_text('seg_file')}  ",
+            f"  {self.get_text('seg_geoloc')}  "
         ]
         self.input_segmented_btn = ctk.CTkSegmentedButton(
             left_col,
@@ -788,7 +790,7 @@ class Application(ctk.CTk):
             height=35
         )
         self.input_segmented_btn.grid(row=0, column=0, padx=0, pady=(0, 10), sticky="ew")
-        self.input_segmented_btn.set(self.get_text("seg_manual"))
+        self.input_segmented_btn.set(f"  {self.get_text('seg_manual')}  ")
         
         # Input container CTkFrame
         self.input_container = ctk.CTkFrame(left_col)
@@ -827,9 +829,9 @@ class Application(ctk.CTk):
         # Map widget
         self.map_widget = TkinterMapView(map_card, corner_radius=12)
         self.map_widget.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
-        self.map_widget.set_position(14.5, -16.2) # Center on Senegal
+        self.map_widget.set_position(18.0858, -15.9785) # Center on Nouakchott
         self.map_widget.set_zoom(6)
-        self.map_marker = self.map_widget.set_marker(14.5, -16.2, text="Position sélectionnée")
+        self.map_marker = self.map_widget.set_marker(18.0858, -15.9785, text="Position sélectionnée")
         self.map_widget.add_left_click_map_command(self.on_map_click)
         
         # Pre-vis widget container
@@ -840,19 +842,19 @@ class Application(ctk.CTk):
         previs_frame.grid_columnconfigure(0, weight=1)
         
         # Pre-vis segmented control
-        previs_seg_values = [
-            self.get_text("previs_load"),
-            self.get_text("previs_solar"),
-            self.get_text("previs_wind")
+        previs_values = [
+            f"  {self.get_text('previs_load')}  ",
+            f"  {self.get_text('previs_solar')}  ",
+            f"  {self.get_text('previs_wind')}  "
         ]
         self.previs_segmented_btn = ctk.CTkSegmentedButton(
             previs_frame,
-            values=previs_seg_values,
+            values=previs_values,
             command=self.update_previs_plot,
-            height=30
+            height=35
         )
         self.previs_segmented_btn.grid(row=0, column=0, padx=15, pady=10, sticky="ew")
-        self.previs_segmented_btn.set(self.get_text("previs_load"))
+        self.previs_segmented_btn.set(f"  {self.get_text('previs_load')}  ")
         
         # previs PlotCanvas widget
         self.previs_canvas = PlotCanvas(previs_frame, dpi=80)
@@ -861,14 +863,15 @@ class Application(ctk.CTk):
         return frame
     
     def on_input_segment_changed(self, value):
+        val_strip = value.strip()
         for f in self.input_sub_frames.values():
             f.grid_forget()
-            
-        if value == self.get_text("seg_manual"):
+
+        if val_strip == self.get_text("seg_manual").strip():
             self.input_sub_frames["manual"].grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
-        elif value == self.get_text("seg_file"):
+        elif val_strip == self.get_text("seg_file").strip():
             self.input_sub_frames["file"].grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
-        elif value == self.get_text("seg_geoloc"):
+        elif val_strip == self.get_text("seg_geoloc").strip():
             self.input_sub_frames["geoloc"].grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def on_map_click(self, coords):
@@ -935,14 +938,14 @@ class Application(ctk.CTk):
         self.update_previs_plot()
 
     def update_previs_plot(self, _=None):
-        tab = self.previs_segmented_btn.get()
+        tab = self.previs_segmented_btn.get().strip()
         fig = self.previs_canvas.fig
         fig.clear()
         ax = fig.add_subplot(111)
         
         # Check matching translated tabs
-        if tab == self.get_text("previs_load"):
-            is_manual_tab = (self.input_segmented_btn.get() == self.get_text("seg_manual"))
+        if tab == self.get_text("previs_load").strip():
+            is_manual_tab = (self.input_segmented_btn.get().strip() == self.get_text("seg_manual").strip())
             if self.load_df is not None and not is_manual_tab:
                 y_values = self.load_df["total_load"].iloc[:168].values
             else:
@@ -971,7 +974,7 @@ class Application(ctk.CTk):
             df = self.weather_df
             if df is None:
                 weather_handler = NASAWeatherDataHandler()
-                df = weather_handler.generate_synthetic_weather(lat=14.5, year=2023)
+                df = weather_handler.generate_synthetic_weather(lat=18.0858, year=2023)
             
             monthly_avg = df.groupby(df.index.month)["solar_irradiance"].mean()
             months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -985,7 +988,7 @@ class Application(ctk.CTk):
             df = self.weather_df
             if df is None:
                 weather_handler = NASAWeatherDataHandler()
-                df = weather_handler.generate_synthetic_weather(lat=14.5, year=2023)
+                df = weather_handler.generate_synthetic_weather(lat=18.0858, year=2023)
             
             monthly_avg = df.groupby(df.index.month)["wind_speed"].mean()
             months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -1131,7 +1134,7 @@ class Application(ctk.CTk):
                 
                 # Generate weather synthetically (stays aligned with load year)
                 weather_handler = NASAWeatherDataHandler()
-                new_weather_df = weather_handler.generate_synthetic_weather(lat=14.5, year=2023)
+                new_weather_df = weather_handler.generate_synthetic_weather(lat=18.0858, year=2023)
                 
                 # Update state safely in GUI thread
                 self.after(0, lambda: self.finish_manual_generation(new_weather_df, new_load_df))
@@ -1331,10 +1334,10 @@ class Application(ctk.CTk):
         g_title = ctk.CTkLabel(geoloc_card, text=self.get_text("geoloc_title"), font=ctk.CTkFont(size=16, weight="bold"))
         g_title.grid(row=0, column=0, padx=15, pady=(20, 15), sticky="ew")
         
-        self.lat_entry = LabeledEntry(geoloc_card, self.get_text("lat_lbl"), 14.5)
+        self.lat_entry = LabeledEntry(geoloc_card, self.get_text("lat_lbl"), 18.0858)
         self.lat_entry.grid(row=1, column=0, padx=15, pady=8, sticky="ew")
         
-        self.lon_entry = LabeledEntry(geoloc_card, self.get_text("lon_lbl"), -16.2)
+        self.lon_entry = LabeledEntry(geoloc_card, self.get_text("lon_lbl"), -15.9785)
         self.lon_entry.grid(row=2, column=0, padx=15, pady=8, sticky="ew")
         
         self.year_entry = LabeledEntry(geoloc_card, self.get_text("year_lbl"), 2023)
@@ -1365,8 +1368,8 @@ class Application(ctk.CTk):
         self.fetch_nasa_btn.configure(state="disabled", text=self.get_text("nasa_status_downloading"))
         self.nasa_status_lbl.configure(text=self.get_text("nasa_status_fetching"), text_color="#1f538d")
         
-        lat = self.lat_entry.get_float(14.5)
-        lon = self.lon_entry.get_float(-16.2)
+        lat = self.lat_entry.get_float(18.0858)
+        lon = self.lon_entry.get_float(-15.9785)
         year = self.year_entry.get_int(2023)
         
         def run():
@@ -2678,14 +2681,14 @@ class Application(ctk.CTk):
                 "widget_attr": "input_container",
                 "title_key": "tut_step1_title",
                 "desc_key": "tut_step1_desc",
-                "setup_func": lambda app: app.input_segmented_btn.set(app.get_text("seg_manual")) or app.on_input_segment_changed(app.get_text("seg_manual")),
+                "setup_func": lambda app: app.input_segmented_btn.set(f"  {app.get_text('seg_manual')}  ") or app.on_input_segment_changed(f"  {app.get_text('seg_manual')}  "),
             },
             {
                 "tab": "Données d'Entrée",
                 "widget_attr": "fetch_nasa_btn",
                 "title_key": "tut_step2_title",
                 "desc_key": "tut_step2_desc",
-                "setup_func": lambda app: app.input_segmented_btn.set(app.get_text("seg_geoloc")) or app.on_input_segment_changed(app.get_text("seg_geoloc")),
+                "setup_func": lambda app: app.input_segmented_btn.set(f"  {app.get_text('seg_geoloc')}  ") or app.on_input_segment_changed(f"  {app.get_text('seg_geoloc')}  "),
             },
             {
                 "tab": "Simulation & Optimisation",

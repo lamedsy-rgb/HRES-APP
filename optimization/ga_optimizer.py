@@ -437,7 +437,7 @@ if __name__ == "__main__":
     from data_handlers.load_generator import generate_synthetic_load
     
     # 1. Generate synthetic hourly inputs
-    lat, lon, year = 14.5, -16.2, 2023
+    lat, lon, year = 18.0858, -15.9785, 2023
     print("Generating offline synthetic weather and load patterns...")
     weather_handler = NASAWeatherDataHandler()
     weather_df = weather_handler.generate_synthetic_weather(lat=lat, year=year)

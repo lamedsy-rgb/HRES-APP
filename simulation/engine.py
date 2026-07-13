@@ -224,7 +224,7 @@ if __name__ == "__main__":
     from data_handlers.load_generator import generate_synthetic_load
     
     # Generate weather and load data
-    lat, lon, year = 14.5, -16.2, 2023
+    lat, lon, year = 18.0858, -15.9785, 2023
     weather_handler = NASAWeatherDataHandler()
     weather_df = weather_handler.generate_synthetic_weather(lat=lat, year=year)
     

@@ -2702,10 +2702,14 @@ class Application(ctk.CTk):
             },
             {
                 "tab": "Données d'Entrée",
-                "widget_attr": "input_container",
+                "widget_attr": "generate_btn",
                 "title_key": "tut_step1_title",
                 "desc_key": "tut_step1_desc",
-                "setup_func": lambda app: app.input_segmented_btn.set(f"  {app.get_text('seg_manual')}  ") or app.on_input_segment_changed(f"  {app.get_text('seg_manual')}  "),
+                "setup_func": lambda app: (
+                    app.input_segmented_btn.set(f"  {app.get_text('seg_manual')}  "),
+                    app.on_input_segment_changed(f"  {app.get_text('seg_manual')}  "),
+                    app.input_sub_frames["manual"]._parent_canvas.yview_moveto(1.0) if hasattr(app.input_sub_frames.get("manual"), "_parent_canvas") else None
+                ),
             },
             {
                 "tab": "Données d'Entrée",

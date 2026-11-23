@@ -11,7 +11,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from simulation.engine import run_simulation
+from simulation.engine import run_simulation, run_simulation_fast
+from models.pv_system import PVSystem
+from models.wind_system import WindSystem
 from optimization.financials import calculate_lcoe, DEFAULT_COST_PARAMS
 
 # Setup logger
@@ -37,7 +39,8 @@ class CustomGA:
         mutation_probability: float = 0.1,
         crossover_probability: float = 0.8,
         elitism_percent: float = 0.05,
-        tournament_size: int = 3
+        tournament_size: int = 3,
+        progress_callback=None
     ):
         self.num_generations = num_generations
         self.sol_per_pop = sol_per_pop
@@ -48,6 +51,7 @@ class CustomGA:
         self.crossover_probability = crossover_probability
         self.elitism_percent = elitism_percent
         self.tournament_size = tournament_size
+        self.progress_callback = progress_callback
 
         # State vars
         self.population = None
@@ -86,8 +90,15 @@ class CustomGA:
             self.fitness_history.append(best_fit)
             self.best_solutions_fitness.append(best_fit)
 
+            best_lcoe_est = (1.0 / best_fit) if best_fit > 1e-9 else float('inf')
+            if self.progress_callback is not None:
+                try:
+                    self.progress_callback(gen + 1, self.num_generations, float(best_fit), float(best_lcoe_est))
+                except Exception:
+                    pass
+
             if (gen + 1) % max(1, self.num_generations // 5) == 0 or gen == 0:
-                logger.info(f"Generation {gen + 1}/{self.num_generations} - Best Fitness: {best_fit:.6f} (LCOE: ${1.0/best_fit if best_fit > 1e-9 else float('inf'):.4f}/kWh)")
+                logger.info(f"Generation {gen + 1}/{self.num_generations} - Best Fitness: {best_fit:.6f} (LCOE: ${best_lcoe_est:.4f}/kWh)")
 
             # 3. Create the next generation
             new_population = np.zeros_like(self.population)
@@ -137,7 +148,8 @@ class CustomGA:
         logger.info(f"Optimization completed. Optimal Fitness: {self.best_solution_fitness:.6f}")
 
     def _tournament_selection(self, fitnesses: np.ndarray) -> np.ndarray:
-        candidates = np.random.choice(self.sol_per_pop, size=self.tournament_size, replace=False)
+        k = max(1, min(self.tournament_size, self.sol_per_pop))
+        candidates = np.random.choice(self.sol_per_pop, size=k, replace=False)
         best_candidate = candidates[np.argmax(fitnesses[candidates])]
         return self.population[best_candidate]
 
@@ -199,13 +211,38 @@ class GAOptimizer:
         self.sol_per_pop = sol_per_pop
         self.use_fallback_ga = use_fallback_ga
         
-        # Pre-compute annual load metrics to save execution cycles inside fitness evaluation
+        # Pre-extract NumPy arrays & pre-compute unit PV/Wind hourly generation profiles
+        # so the GA fitness loop avoids redundant DataFrame & physics overhead on every chromosome
         if "total_load" in load_df.columns:
-            self.total_annual_load_kwh = float(load_df["total_load"].sum())
+            self._loads = load_df["total_load"].to_numpy(dtype=np.float64, copy=False)
         elif "load" in load_df.columns:
-            self.total_annual_load_kwh = float(load_df["load"].sum())
+            self._loads = load_df["load"].to_numpy(dtype=np.float64, copy=False)
         else:
-            self.total_annual_load_kwh = float(load_df.iloc[:, 0].sum())
+            self._loads = load_df.iloc[:, 0].to_numpy(dtype=np.float64, copy=False)
+        self.total_annual_load_kwh = float(np.sum(self._loads))
+
+        solar_arr = weather_df["solar_irradiance"].to_numpy(dtype=np.float64, copy=False)
+        temp_arr = weather_df["temperature"].to_numpy(dtype=np.float64, copy=False)
+        wind_arr = weather_df["wind_speed"].to_numpy(dtype=np.float64, copy=False)
+
+        pv_unit_model = PVSystem(
+            capacity=1.0,
+            derating_factor=self.system_config_base.get("pv_derating_factor", 0.8),
+            temp_coeff=self.system_config_base.get("pv_temp_coeff", -0.004),
+            noct=self.system_config_base.get("pv_noct", 45.0)
+        )
+        wind_unit_model = WindSystem(
+            anemometer_height=self.system_config_base.get("wind_anemometer_height", 10.0),
+            hub_height=self.system_config_base.get("wind_hub_height", 50.0),
+            rated_capacity=1.0,
+            wind_shear_exponent=self.system_config_base.get("wind_shear_exponent", 0.14),
+            cut_in_speed=self.system_config_base.get("wind_cut_in_speed", 3.0),
+            rated_speed=self.system_config_base.get("wind_rated_speed", 12.0),
+            cut_out_speed=self.system_config_base.get("wind_cut_out_speed", 25.0),
+            use_cubic_curve=self.system_config_base.get("wind_use_cubic_curve", True)
+        )
+        self._pv_unit_powers = pv_unit_model.calculate_power(solar_arr, temp_arr)
+        self._wind_unit_powers = wind_unit_model.calculate_power(wind_arr)
 
     def fitness_func(self, ga_instance, solution, solution_idx) -> float:
         """
@@ -228,20 +265,17 @@ class GAOptimizer:
         }
         
         try:
-            # Run physical simulation
-            hourly_df, summary = run_simulation(self.weather_df, self.load_df, config)
+            # Fast NumPy array simulation (skips DataFrame creation & reuses pre-computed unit profiles)
+            pv_powers = self._pv_unit_powers * pv_capacity
+            wind_powers = self._wind_unit_powers * wind_capacity
+            summary = run_simulation_fast(pv_powers, wind_powers, self._loads, config)
             
             # Extract key simulation outputs
             fuel_consumption = summary["total_fuel_consumption_liters"]
             unmet_load = summary["total_unmet_load_kwh"]
             lolp = summary["lolp"]
             battery_soh = summary["battery_soh_pct"]
-            
-            # Extract diesel generator annual operating hours
-            if "diesel_output" in hourly_df.columns:
-                diesel_operating_hours = float((hourly_df["diesel_output"] > 1e-3).sum())
-            else:
-                diesel_operating_hours = 0.0
+            diesel_operating_hours = summary["diesel_operating_hours"]
                 
             # Compute annual battery state-of-health degradation fraction
             battery_degradation = max(0.0, (100.0 - battery_soh) / 100.0)
@@ -281,7 +315,7 @@ class GAOptimizer:
             
         return fitness
 
-    def optimize(self) -> Dict[str, Any]:
+    def optimize(self, progress_callback=None) -> Dict[str, Any]:
         """
         Runs the optimization routine. Attempts to run PyGAD first,
         falling back automatically to CustomGA if PyGAD is missing or fails.
@@ -312,6 +346,16 @@ class GAOptimizer:
             
             # Set parent mating size to half the population
             num_parents_mating = max(2, self.sol_per_pop // 2)
+
+            def _on_pygad_gen(ga_inst):
+                if progress_callback is not None:
+                    try:
+                        gen_num = int(ga_inst.generations_completed)
+                        best_f = float(ga_inst.best_solutions_fitness[-1]) if ga_inst.best_solutions_fitness else 0.0
+                        best_lcoe_est = (1.0 / best_f) if best_f > 1e-9 else float("inf")
+                        progress_callback(gen_num, self.num_generations, best_f, best_lcoe_est)
+                    except Exception:
+                        pass
             
             try:
                 ga_instance = pygad.GA(
@@ -328,13 +372,14 @@ class GAOptimizer:
                     mutation_probability=0.1,
                     crossover_probability=0.8,
                     keep_elitism=1,
+                    on_generation=_on_pygad_gen if progress_callback is not None else None,
                     suppress_warnings=True
                 )
                 
                 ga_instance.run()
                 
                 best_solution, best_fitness, best_idx = ga_instance.best_solution()
-                convergence_history = list(ga_instance.best_solutions_fitness)
+                convergence_history = [float(x) for x in ga_instance.best_solutions_fitness]
                 method = "pygad"
                 
             except Exception as e:
@@ -352,13 +397,14 @@ class GAOptimizer:
                 mutation_probability=0.1,
                 crossover_probability=0.8,
                 elitism_percent=0.05,
-                tournament_size=3
+                tournament_size=3,
+                progress_callback=progress_callback
             )
             custom_ga.run()
             
             best_solution = custom_ga.best_solution
             best_fitness = custom_ga.best_solution_fitness
-            convergence_history = custom_ga.best_solutions_fitness
+            convergence_history = [float(x) for x in custom_ga.best_solutions_fitness]
             method = "custom_numpy"
             
         # Post-process the best configuration to extract detailed KPIs

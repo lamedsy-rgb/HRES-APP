@@ -5,6 +5,7 @@ import time
 import math
 import logging
 import threading
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox as mb
@@ -27,6 +28,7 @@ from data_handlers.load_generator import generate_synthetic_load
 from simulation.engine import run_simulation
 from optimization.ga_optimizer import GAOptimizer
 from optimization.financials import DEFAULT_COST_PARAMS, calculate_lcoe
+from reporting.report_generator import generate_engineering_report
 from tkintermapview import TkinterMapView
 from gui.translations import TRANSLATIONS
 
@@ -852,6 +854,13 @@ class Application(ctk.CTk):
         
         # Map widget
         self.map_widget = TkinterMapView(map_card, corner_radius=12)
+        try:
+            self.map_widget.set_tile_server(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+                max_zoom=18
+            )
+        except Exception as e:
+            logger.warning(f"Impossible de configurer les tuiles Esri, repli par défaut: {e}")
         self.map_widget.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
         self.map_widget.set_position(18.0858, -15.9785) # Center on Nouakchott
         self.map_widget.set_zoom(6)
@@ -1283,13 +1292,18 @@ class Application(ctk.CTk):
                 if not wind_col: missing.append("wind_speed")
                 raise ValueError(f"Could not identify columns: {', '.join(missing)}.")
                 
+            year_val = self.year_entry.get_int(2023) if hasattr(self, "year_entry") else 2023
+            standard_idx = pd.date_range(start=f"{year_val}-01-01 00:00:00", end=f"{year_val}-12-31 23:00:00", freq="h")
+            standard_idx = standard_idx[~((standard_idx.month == 2) & (standard_idx.day == 29))]
             new_weather_df = pd.DataFrame({
-                "solar_irradiance": df[solar_col].astype(float),
-                "temperature": df[temp_col].astype(float),
-                "wind_speed": df[wind_col].astype(float)
-            })
+                "solar_irradiance": df[solar_col].astype(float).values,
+                "temperature": df[temp_col].astype(float).values,
+                "wind_speed": df[wind_col].astype(float).values
+            }, index=standard_idx)
             
             self.weather_df = new_weather_df
+            if self.load_df is not None and len(self.load_df) == len(standard_idx):
+                self.load_df.index = standard_idx
             self.weather_file_lbl.configure(text=f"{filename}\n✓ OK", text_color="#2ca02c")
             logger.info("Weather data loaded successfully.")
             self.trigger_quick_base_simulation()
@@ -1809,14 +1823,31 @@ class Application(ctk.CTk):
         
         self.results_page_needs_refresh = True
         
-        # Tab title
+        # Tab header bar (title + 1-click Export Report button)
+        is_rtl = (getattr(self, "current_language", "fr") == "ar")
+        header_bar = ctk.CTkFrame(frame, fg_color="transparent")
+        header_bar.grid(row=0, column=0, padx=30, pady=(20, 10), sticky="ew")
+        header_bar.grid_columnconfigure(0, weight=0 if is_rtl else 1)
+        header_bar.grid_columnconfigure(1, weight=1 if is_rtl else 0)
+
         title = ctk.CTkLabel(
-            frame, 
+            header_bar, 
             text=self.get_text("tab3_title"), 
             font=ctk.CTkFont(size=22, weight="bold"),
             anchor=self.get_anchor()
         )
-        title.grid(row=0, column=0, padx=30, pady=(20, 10), sticky="ew")
+        title.grid(row=0, column=1 if is_rtl else 0, sticky="ew")
+
+        self.export_report_btn = ctk.CTkButton(
+            header_bar,
+            text=self.get_text("export_report_btn"),
+            height=36,
+            fg_color="#1d4ed8",
+            hover_color="#1e40af",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.export_engineering_report
+        )
+        self.export_report_btn.grid(row=0, column=0 if is_rtl else 1, padx=(0, 12) if is_rtl else (12, 0), sticky="e" if not is_rtl else "w")
         
         # Split layout using tk.PanedWindow
         split_frame = self.create_paned_window(frame, tk.HORIZONTAL)
@@ -1947,6 +1978,70 @@ class Application(ctk.CTk):
         frame.on_show = self.refresh_results_tab_contents
         
         return frame
+
+    def export_engineering_report(self, output_path=None, open_browser=True):
+        """Exports a self-contained print-ready A4 HTML engineering & financial report."""
+        if self.hourly_df is None or not self.results:
+            mb.showwarning(self.get_text("error"), self.get_text("export_report_no_data"))
+            return None
+
+        if output_path is None:
+            default_name = f"HRES_Engineering_Report_{time.strftime('%Y%m%d_%H%M')}.html"
+            output_path = fd.asksaveasfilename(
+                defaultextension=".html",
+                initialfile=default_name,
+                filetypes=[("HTML Engineering Report", "*.html"), ("All Files", "*.*")],
+                title=self.get_text("export_report_title")
+            )
+            if not output_path:
+                return None
+
+        try:
+            lat = self.lat_entry.get_float(18.0858) if hasattr(self, "lat_entry") else 18.0858
+            lon = self.lon_entry.get_float(-15.9785) if hasattr(self, "lon_entry") else -15.9785
+            year = self.year_entry.get_int(2023) if hasattr(self, "year_entry") else 2023
+            start_day = int(self.start_day_slider.get()) if hasattr(self, "start_day_slider") else None
+
+            cost_overrides = {
+                "pv_capex": self.pv_capex_entry.get_float(1000.0) if hasattr(self, "pv_capex_entry") else 1000.0,
+                "wind_capex": self.wind_capex_entry.get_float(1600.0) if hasattr(self, "wind_capex_entry") else 1600.0,
+                "battery_capex": self.battery_capex_entry.get_float(300.0) if hasattr(self, "battery_capex_entry") else 300.0,
+                "diesel_capex": self.diesel_capex_entry.get_float(400.0) if hasattr(self, "diesel_capex_entry") else 400.0,
+                "diesel_fuel_price": self.fuel_price_entry.get_float(1.2) if hasattr(self, "fuel_price_entry") else 1.2,
+            }
+
+            metadata = {
+                "site_name": f"Microgrid Site ({lat:.4f}°, {lon:.4f}°)",
+                "latitude": lat,
+                "longitude": lon,
+                "year": year,
+            }
+
+            report_path = generate_engineering_report(
+                hourly_df=self.hourly_df,
+                results=self.results,
+                output_path=output_path,
+                metadata=metadata,
+                cost_params=cost_overrides,
+                language=getattr(self, "current_language", "fr"),
+                sample_week_start_day=start_day,
+            )
+
+            logger.info(f"Engineering report generated: {report_path}")
+            if open_browser:
+                try:
+                    webbrowser.open(f"file:///{report_path.replace(os.sep, '/')}")
+                except Exception as browser_err:
+                    logger.warning(f"Could not auto-open browser: {browser_err}")
+                mb.showinfo(
+                    self.get_text("success"),
+                    self.get_text("export_report_success").format(path=report_path)
+                )
+            return report_path
+        except Exception as e:
+            logger.error(f"Failed to export engineering report: {e}")
+            mb.showerror(self.get_text("error"), f"{self.get_text('export_report_error')}\n{e}")
+            return None
 
     def create_kpi_row(self, parent, title, value, row, fg_color):
         card = ctk.CTkFrame(parent, corner_radius=6, fg_color=fg_color, height=35)

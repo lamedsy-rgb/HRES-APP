@@ -59,19 +59,22 @@ def calculate_component_replacements_and_salvage(
             - discounted_salvage_value ($) (at year project_lifetime)
             - list of replacement events (dict with year, cost, discounted_cost)
     """
-    if capacity <= 0 or component_lifetime <= 0 or component_lifetime == float('inf') or math.isnan(component_lifetime):
+    if capacity <= 0 or component_lifetime <= 0 or component_lifetime == float('inf') or math.isnan(component_lifetime) or project_lifetime <= 0:
         return 0.0, 0.0, []
-        
+
+    # Guard against unrealistically tiny lifetimes causing excessive loop iterations
+    effective_lifetime = max(component_lifetime, 0.25)
+
     discounted_replacement_cost = 0.0
     replacement_events = []
-    
+
     total_replacement_cost = capacity * replacement_rate
     initial_cost = capacity * capex_rate
-    
+
     # Calculate replacement years
     i = 1
     while True:
-        rep_year = int(round(i * component_lifetime))
+        rep_year = int(round(i * effective_lifetime))
         if rep_year >= project_lifetime:
             break
         if rep_year > 0:
@@ -84,27 +87,27 @@ def calculate_component_replacements_and_salvage(
                 "discounted_cost": discounted_cost
             })
         i += 1
-        
+
     # Calculate Salvage Value at the end of project lifetime
     num_replacements = len(replacement_events)
     if num_replacements > 0:
-        last_installation_year = int(round(num_replacements * component_lifetime))
+        last_installation_year = replacement_events[-1]["year"]
         base_cost = total_replacement_cost
     else:
         last_installation_year = 0
         base_cost = initial_cost
-        
+
     age_at_end = project_lifetime - last_installation_year
-    remaining_lifetime = component_lifetime - age_at_end
-    
+    remaining_lifetime = effective_lifetime - age_at_end
+
     salvage_val = 0.0
     discounted_salvage_val = 0.0
-    
+
     if remaining_lifetime > 0:
         # Linear depreciation
-        salvage_val = base_cost * (remaining_lifetime / component_lifetime)
+        salvage_val = base_cost * (remaining_lifetime / effective_lifetime)
         discounted_salvage_val = salvage_val / ((1.0 + discount_rate) ** project_lifetime)
-        
+
     return discounted_replacement_cost, discounted_salvage_val, replacement_events
 
 def calculate_npc(
@@ -137,6 +140,8 @@ def calculate_npc(
     p = {**DEFAULT_COST_PARAMS, **cost_params}
     
     project_lifetime = int(p["project_lifetime"])
+    if project_lifetime <= 0:
+        raise ValueError("project_lifetime must be strictly positive.")
     discount_rate = float(p["discount_rate"])
     
     # 1. Initial Capital Cost (CAPEX)
@@ -152,9 +157,10 @@ def calculate_npc(
     battery_om = battery_capacity * p["battery_opex"]
     diesel_om = diesel_capacity * p["diesel_opex"]
     
+    annual_fixed_om = pv_om + wind_om + battery_om + diesel_om
     annual_fuel_cost = annual_fuel_consumption * p["diesel_fuel_price"]
     
-    annual_om = pv_om + wind_om + battery_om + diesel_om + annual_fuel_cost
+    annual_om = annual_fixed_om + annual_fuel_cost
     
     # Discounted O&M Cost
     # O&M is assumed constant over the project lifetime and discounted to year 0
@@ -163,6 +169,8 @@ def calculate_npc(
     else:
         discount_factor = sum(1.0 / ((1.0 + discount_rate) ** t) for t in range(1, project_lifetime + 1))
         
+    total_discounted_fixed_om = annual_fixed_om * discount_factor
+    total_discounted_fuel = annual_fuel_cost * discount_factor
     total_discounted_om = annual_om * discount_factor
     
     # 3. Replacement and Salvage Costs
@@ -213,9 +221,16 @@ def calculate_npc(
         "battery_capital": battery_cap,
         "diesel_capital": diesel_cap,
         "annual_om_cost": annual_om,
+        "annual_fixed_om_cost": annual_fixed_om,
         "annual_fuel_cost": annual_fuel_cost,
         "discounted_om": total_discounted_om,
+        "discounted_fixed_om": total_discounted_fixed_om,
+        "discounted_fuel": total_discounted_fuel,
         "discounted_replacement": total_discounted_replacement,
+        "pv_replacement": pv_rep,
+        "wind_replacement": wind_rep,
+        "battery_replacement": bat_rep,
+        "diesel_replacement": diesel_rep,
         "discounted_salvage": total_discounted_salvage,
         "battery_lifetime_years": battery_lifetime,
         "diesel_lifetime_years": diesel_lifetime,

@@ -20,6 +20,306 @@ from simulation.ems import dispatch_hour
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+def _simulate_ems_arrays(
+    pv_powers: np.ndarray,
+    wind_powers: np.ndarray,
+    loads: np.ndarray,
+    config: Dict[str, Any],
+    return_hourly_arrays: bool = True
+):
+    """
+    High-performance chronological 8,760h EMS kernel mathematically equivalent to
+    iterating simulation.ems.dispatch_hour with BatterySystem and DieselSystem.
+    Eliminates per-hour Python dict allocations and scalar NumPy wrapper overhead.
+    """
+    N = len(loads)
+    bat_capacity = float(config.get("battery_capacity", 0.0))
+    has_bat = bat_capacity > 0.0
+    if has_bat:
+        min_soc = float(config.get("battery_min_soc", 0.2))
+        max_soc = float(config.get("battery_max_soc", 1.0))
+        initial_soc = float(config.get("battery_initial_soc", 0.5))
+        if not (0.0 <= min_soc < max_soc <= 1.0):
+            raise ValueError("SoC limits must satisfy 0.0 <= min_soc < max_soc <= 1.0")
+        if not (0.0 <= initial_soc <= 1.0):
+            raise ValueError("Initial SoC must be between 0.0 and 1.0")
+        eff_charge = float(config.get("battery_efficiency_charge", 0.95))
+        eff_discharge = float(config.get("battery_efficiency_discharge", 0.95))
+        inv_eff_charge = 1.0 / eff_charge
+        inv_eff_discharge = 1.0 / eff_discharge
+        max_charge_rate = float(config.get("battery_max_charge_rate", 0.5))
+        max_discharge_rate = float(config.get("battery_max_discharge_rate", 0.5))
+        self_discharge_rate = float(config.get("battery_self_discharge_rate", 0.0001))
+        lifetime_cycles = float(config.get("battery_lifetime_cycles", 3000.0))
+        lifetime_throughput_limit = lifetime_cycles * bat_capacity
+        inv_lifetime_limit = (1.0 / lifetime_throughput_limit) if lifetime_throughput_limit > 0.0 else 0.0
+        current_capacity = bat_capacity
+        stored_energy = initial_soc * bat_capacity
+        total_throughput = 0.0
+    else:
+        min_soc = max_soc = eff_charge = eff_discharge = 0.0
+        inv_eff_charge = inv_eff_discharge = 0.0
+        max_charge_rate = max_discharge_rate = self_discharge_rate = 0.0
+        lifetime_throughput_limit = inv_lifetime_limit = 0.0
+        current_capacity = stored_energy = total_throughput = 0.0
+
+    diesel_capacity = float(config.get("diesel_capacity", 0.0))
+    has_diesel = diesel_capacity > 0.0
+    if has_diesel:
+        diesel_f0 = float(config.get("diesel_f0", 0.08))
+        diesel_f1 = float(config.get("diesel_f1", 0.25))
+        diesel_min_load = float(config.get("diesel_min_load_fraction", 0.3)) * diesel_capacity
+        diesel_f0_cap = diesel_f0 * diesel_capacity
+    else:
+        diesel_f0 = diesel_f1 = diesel_min_load = diesel_f0_cap = 0.0
+
+    # Pre-compute net load in C via NumPy and convert to Python list for fastest CPython iteration
+    net_loads = (loads - (pv_powers + wind_powers)).tolist()
+
+    total_diesel_gen = 0.0
+    total_fuel = 0.0
+    total_unmet = 0.0
+    total_dump = 0.0
+    capacity_shortage_hours = 0
+    diesel_operating_hours = 0
+
+    if return_hourly_arrays:
+        battery_charge_list = [0.0] * N
+        battery_discharge_list = [0.0] * N
+        battery_soc_list = [0.0] * N
+        diesel_power_list = [0.0] * N
+        diesel_fuel_list = [0.0] * N
+        dump_power_list = [0.0] * N
+        unmet_load_list = [0.0] * N
+
+    for t in range(N):
+        net_load = net_loads[t]
+        bat_charge = 0.0
+        bat_discharge = 0.0
+        diesel_p = 0.0
+        diesel_f = 0.0
+        dump = 0.0
+        unmet = 0.0
+
+        if net_load <= 0.0:
+            surplus = -net_load
+            if has_bat:
+                # Apply hourly self-discharge
+                loss = self_discharge_rate * current_capacity
+                if loss > stored_energy:
+                    stored_energy = 0.0
+                else:
+                    stored_energy -= loss
+
+                max_e_c = max_charge_rate * current_capacity
+                headroom = max_soc * current_capacity - stored_energy
+                max_e_soc = (headroom * inv_eff_charge) if headroom > 0.0 else 0.0
+
+                actual_charge = surplus
+                if max_e_c < actual_charge:
+                    actual_charge = max_e_c
+                if max_e_soc < actual_charge:
+                    actual_charge = max_e_soc
+                if actual_charge < 0.0:
+                    actual_charge = 0.0
+
+                added = actual_charge * eff_charge
+                stored_energy += added
+                max_allowed = max_soc * current_capacity
+                if stored_energy > max_allowed:
+                    stored_energy = max_allowed
+
+                total_throughput += added
+                if inv_lifetime_limit > 0.0:
+                    decay = 1.0 - total_throughput * inv_lifetime_limit
+                    current_capacity = (bat_capacity * decay) if decay > 0.0 else 0.0
+                    max_allowed = max_soc * current_capacity
+                    if stored_energy > max_allowed:
+                        stored_energy = max_allowed
+
+                bat_charge = actual_charge
+                dump = surplus - bat_charge
+            else:
+                dump = surplus
+        else:
+            deficit = net_load
+            if has_bat:
+                # Apply hourly self-discharge
+                loss = self_discharge_rate * current_capacity
+                if loss > stored_energy:
+                    stored_energy = 0.0
+                else:
+                    stored_energy -= loss
+
+                max_e_c = max_discharge_rate * current_capacity
+                avail = stored_energy - min_soc * current_capacity
+                max_e_soc = (avail * eff_discharge) if avail > 0.0 else 0.0
+
+                actual_discharge = deficit
+                if max_e_c < actual_discharge:
+                    actual_discharge = max_e_c
+                if max_e_soc < actual_discharge:
+                    actual_discharge = max_e_soc
+                if actual_discharge < 0.0:
+                    actual_discharge = 0.0
+
+                stored_energy -= actual_discharge * inv_eff_discharge
+                if stored_energy < 0.0:
+                    stored_energy = 0.0
+
+                total_throughput += actual_discharge
+                if inv_lifetime_limit > 0.0:
+                    decay = 1.0 - total_throughput * inv_lifetime_limit
+                    current_capacity = (bat_capacity * decay) if decay > 0.0 else 0.0
+                    max_allowed = max_soc * current_capacity
+                    if stored_energy > max_allowed:
+                        stored_energy = max_allowed
+
+                bat_discharge = actual_discharge
+                remaining_deficit = deficit - bat_discharge
+            else:
+                remaining_deficit = deficit
+
+            if remaining_deficit > 0.0:
+                if has_diesel:
+                    if remaining_deficit < diesel_min_load:
+                        diesel_p = diesel_min_load
+                        excess_gen = diesel_min_load - remaining_deficit
+                        if has_bat:
+                            # Charge battery with excess min-load output (without double self-discharge)
+                            max_e_c = max_charge_rate * current_capacity
+                            headroom = max_soc * current_capacity - stored_energy
+                            max_e_soc = (headroom * inv_eff_charge) if headroom > 0.0 else 0.0
+
+                            actual_charge = excess_gen
+                            if max_e_c < actual_charge:
+                                actual_charge = max_e_c
+                            if max_e_soc < actual_charge:
+                                actual_charge = max_e_soc
+                            if actual_charge < 0.0:
+                                actual_charge = 0.0
+
+                            added = actual_charge * eff_charge
+                            stored_energy += added
+                            max_allowed = max_soc * current_capacity
+                            if stored_energy > max_allowed:
+                                stored_energy = max_allowed
+
+                            total_throughput += added
+                            if inv_lifetime_limit > 0.0:
+                                decay = 1.0 - total_throughput * inv_lifetime_limit
+                                current_capacity = (bat_capacity * decay) if decay > 0.0 else 0.0
+                                max_allowed = max_soc * current_capacity
+                                if stored_energy > max_allowed:
+                                    stored_energy = max_allowed
+
+                            bat_charge = actual_charge
+                            dump = excess_gen - bat_charge
+                        else:
+                            dump = excess_gen
+                    elif remaining_deficit <= diesel_capacity:
+                        diesel_p = remaining_deficit
+                    else:
+                        diesel_p = diesel_capacity
+                        unmet = remaining_deficit - diesel_capacity
+
+                    if diesel_p > 0.0:
+                        diesel_f = diesel_f0_cap + diesel_f1 * diesel_p
+                else:
+                    unmet = remaining_deficit
+
+        total_diesel_gen += diesel_p
+        total_fuel += diesel_f
+        total_dump += dump
+        total_unmet += unmet
+        if unmet > 1e-3:
+            capacity_shortage_hours += 1
+        if diesel_p > 1e-3:
+            diesel_operating_hours += 1
+
+        if return_hourly_arrays:
+            battery_charge_list[t] = bat_charge
+            battery_discharge_list[t] = bat_discharge
+            battery_soc_list[t] = (stored_energy / current_capacity) if (has_bat and current_capacity > 0.0) else 0.0
+            diesel_power_list[t] = diesel_p
+            diesel_fuel_list[t] = diesel_f
+            dump_power_list[t] = dump
+            unmet_load_list[t] = unmet
+
+    total_load = float(np.sum(loads))
+    total_pv_gen = float(np.sum(pv_powers))
+    total_wind_gen = float(np.sum(wind_powers))
+
+    lolp = total_unmet / total_load if total_load > 0.0 else 0.0
+    total_load_served = total_load - total_unmet
+    if total_load_served > 0.0:
+        rf = 1.0 - (total_diesel_gen / total_load_served)
+    else:
+        rf = 1.0
+    rf = max(0.0, min(1.0, rf))
+
+    if has_bat:
+        battery_soh = (current_capacity / bat_capacity) * 100.0 if bat_capacity > 0.0 else 0.0
+        battery_remaining_capacity = current_capacity
+        battery_throughput = total_throughput
+    else:
+        battery_soh = 100.0
+        battery_remaining_capacity = 0.0
+        battery_throughput = 0.0
+
+    summary_stats = {
+        "total_load_kwh": total_load,
+        "total_pv_generation_kwh": total_pv_gen,
+        "total_wind_generation_kwh": total_wind_gen,
+        "total_diesel_generation_kwh": total_diesel_gen,
+        "total_fuel_consumption_liters": total_fuel,
+        "total_dump_power_kwh": total_dump,
+        "total_unmet_load_kwh": total_unmet,
+        "lolp": lolp,
+        "renewable_fraction": rf,
+        "capacity_shortage_hours": capacity_shortage_hours,
+        "diesel_operating_hours": float(diesel_operating_hours),
+        "battery_soh_pct": battery_soh,
+        "battery_remaining_capacity_kwh": battery_remaining_capacity,
+        "battery_total_throughput_kwh": battery_throughput,
+    }
+
+    if not return_hourly_arrays:
+        return None, summary_stats
+
+    hourly_arrays = {
+        "battery_charge": np.array(battery_charge_list, dtype=np.float64),
+        "battery_discharge": np.array(battery_discharge_list, dtype=np.float64),
+        "battery_soc": np.array(battery_soc_list, dtype=np.float64),
+        "diesel_output": np.array(diesel_power_list, dtype=np.float64),
+        "diesel_fuel": np.array(diesel_fuel_list, dtype=np.float64),
+        "dump_power": np.array(dump_power_list, dtype=np.float64),
+        "unmet_load": np.array(unmet_load_list, dtype=np.float64),
+    }
+    return hourly_arrays, summary_stats
+
+
+def run_simulation_fast(
+    pv_powers: np.ndarray,
+    wind_powers: np.ndarray,
+    loads: np.ndarray,
+    config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Fast summary-only simulation using pre-extracted NumPy arrays.
+    Ideal for Genetic Algorithm fitness evaluation (skips pandas DataFrame construction).
+    """
+    _, summary_stats = _simulate_ems_arrays(
+        pv_powers=pv_powers,
+        wind_powers=wind_powers,
+        loads=loads,
+        config=config,
+        return_hourly_arrays=False
+    )
+    return summary_stats
+
+
 def run_simulation(
     weather_df: pd.DataFrame,
     load_df: pd.DataFrame,
@@ -61,7 +361,7 @@ def run_simulation(
     if len(load_df) != N:
         raise ValueError(f"Length mismatch: weather_df has {N} rows, but load_df has {len(load_df)} rows.")
 
-    # 1. Instantiate the physical component models
+    # 1. Instantiate PV and Wind physical models for vectorized hourly output
     pv_system = PVSystem(
         capacity=config.get("pv_capacity", 0.0),
         derating_factor=config.get("pv_derating_factor", 0.8),
@@ -79,79 +379,32 @@ def run_simulation(
         cut_out_speed=config.get("wind_cut_out_speed", 25.0),
         use_cubic_curve=config.get("wind_use_cubic_curve", True)
     )
-    
-    bat_capacity = config.get("battery_capacity", 0.0)
-    battery_system = None
-    if bat_capacity > 0:
-        battery_system = BatterySystem(
-            capacity=bat_capacity,
-            nominal_voltage=config.get("battery_nominal_voltage", 48.0),
-            min_soc=config.get("battery_min_soc", 0.2),
-            max_soc=config.get("battery_max_soc", 1.0),
-            initial_soc=config.get("battery_initial_soc", 0.5),
-            efficiency_charge=config.get("battery_efficiency_charge", 0.95),
-            efficiency_discharge=config.get("battery_efficiency_discharge", 0.95),
-            max_charge_rate=config.get("battery_max_charge_rate", 0.5),
-            max_discharge_rate=config.get("battery_max_discharge_rate", 0.5),
-            self_discharge_rate=config.get("battery_self_discharge_rate", 0.0001),
-            lifetime_cycles=config.get("battery_lifetime_cycles", 3000.0)
-        )
-        
-    diesel_capacity = config.get("diesel_capacity", 0.0)
-    diesel_system = None
-    if diesel_capacity > 0:
-        diesel_system = DieselSystem(
-            capacity=diesel_capacity,
-            f0=config.get("diesel_f0", 0.08),
-            f1=config.get("diesel_f1", 0.25),
-            min_load_fraction=config.get("diesel_min_load_fraction", 0.3)
-        )
 
-    # 2. Extract load values (with fallback)
+    # 2. Extract load & weather NumPy arrays
     if "total_load" in load_df.columns:
-        loads = load_df["total_load"].values
+        loads = load_df["total_load"].to_numpy(dtype=np.float64, copy=False)
     elif "load" in load_df.columns:
-        loads = load_df["load"].values
+        loads = load_df["load"].to_numpy(dtype=np.float64, copy=False)
     else:
-        loads = load_df.iloc[:, 0].values
+        loads = load_df.iloc[:, 0].to_numpy(dtype=np.float64, copy=False)
 
-    # 3. Vectorized pre-calculation of PV and Wind power outputs (highly optimized)
-    solar_irradiances = weather_df["solar_irradiance"].values
-    temperatures = weather_df["temperature"].values
-    wind_speeds = weather_df["wind_speed"].values
+    solar_irradiances = weather_df["solar_irradiance"].to_numpy(dtype=np.float64, copy=False)
+    temperatures = weather_df["temperature"].to_numpy(dtype=np.float64, copy=False)
+    wind_speeds = weather_df["wind_speed"].to_numpy(dtype=np.float64, copy=False)
     
     pv_powers = pv_system.calculate_power(solar_irradiances, temperatures)
     wind_powers = wind_system.calculate_power(wind_speeds)
 
-    # 4. Pre-allocate arrays for simulation outputs (for execution speed)
-    battery_charge_arr = np.zeros(N)
-    battery_discharge_arr = np.zeros(N)
-    battery_soc_arr = np.zeros(N)
-    diesel_power_arr = np.zeros(N)
-    diesel_fuel_arr = np.zeros(N)
-    dump_power_arr = np.zeros(N)
-    unmet_load_arr = np.zeros(N)
+    # 3. Execute optimized chronological EMS loop
+    hourly_arrays, summary_stats = _simulate_ems_arrays(
+        pv_powers=pv_powers,
+        wind_powers=wind_powers,
+        loads=loads,
+        config=config,
+        return_hourly_arrays=True
+    )
 
-    # 5. Chronological EMS Simulation Loop
-    for t in range(N):
-        dispatch = dispatch_hour(
-            pv_power=pv_powers[t],
-            wind_power=wind_powers[t],
-            load=loads[t],
-            battery=battery_system,
-            diesel=diesel_system,
-            duration_hr=1.0
-        )
-        
-        battery_charge_arr[t] = dispatch["battery_charge"]
-        battery_discharge_arr[t] = dispatch["battery_discharge"]
-        battery_soc_arr[t] = dispatch["battery_soc"]
-        diesel_power_arr[t] = dispatch["diesel_power"]
-        diesel_fuel_arr[t] = dispatch["diesel_fuel"]
-        dump_power_arr[t] = dispatch["dump_power"]
-        unmet_load_arr[t] = dispatch["unmet_load"]
-
-    # 6. Construct hourly metrics DataFrame
+    # 4. Construct hourly metrics DataFrame
     hourly_df = pd.DataFrame({
         "solar_irradiance": solar_irradiances,
         "wind_speed": wind_speeds,
@@ -159,59 +412,14 @@ def run_simulation(
         "load": loads,
         "pv_output": pv_powers,
         "wind_output": wind_powers,
-        "battery_charge": battery_charge_arr,
-        "battery_discharge": battery_discharge_arr,
-        "battery_soc": battery_soc_arr,
-        "diesel_output": diesel_power_arr,
-        "diesel_fuel": diesel_fuel_arr,
-        "dump_power": dump_power_arr,
-        "unmet_load": unmet_load_arr
+        "battery_charge": hourly_arrays["battery_charge"],
+        "battery_discharge": hourly_arrays["battery_discharge"],
+        "battery_soc": hourly_arrays["battery_soc"],
+        "diesel_output": hourly_arrays["diesel_output"],
+        "diesel_fuel": hourly_arrays["diesel_fuel"],
+        "dump_power": hourly_arrays["dump_power"],
+        "unmet_load": hourly_arrays["unmet_load"]
     }, index=weather_df.index)
-
-    # 7. Calculate Summary Statistics
-    total_load = float(np.sum(loads))
-    total_pv_gen = float(np.sum(pv_powers))
-    total_wind_gen = float(np.sum(wind_powers))
-    total_diesel_gen = float(np.sum(diesel_power_arr))
-    total_fuel = float(np.sum(diesel_fuel_arr))
-    total_unmet = float(np.sum(unmet_load_arr))
-    
-    lolp = total_unmet / total_load if total_load > 0 else 0.0
-    
-    # Renewable Fraction (RF) = 1.0 - (Total Diesel Generation / Total Load Served)
-    total_load_served = total_load - total_unmet
-    if total_load_served > 0:
-        rf = 1.0 - (total_diesel_gen / total_load_served)
-    else:
-        rf = 1.0
-    # Keep RF physically bound between 0 and 1
-    rf = max(0.0, min(1.0, rf))
-    
-    capacity_shortage_hours = int(np.sum(unmet_load_arr > 1e-3))
-    
-    # Battery health metrics
-    battery_soh = 100.0
-    battery_remaining_capacity = 0.0
-    battery_throughput = 0.0
-    if battery_system is not None:
-        status = battery_system.get_status()
-        battery_soh = status["current_capacity_kwh"] / status["capacity_nominal_kwh"] * 100.0 if status["capacity_nominal_kwh"] > 0 else 0.0
-        battery_remaining_capacity = status["current_capacity_kwh"]
-        battery_throughput = status["total_throughput_kwh"]
-
-    summary_stats = {
-        "total_pv_generation_kwh": total_pv_gen,
-        "total_wind_generation_kwh": total_wind_gen,
-        "total_diesel_generation_kwh": total_diesel_gen,
-        "total_fuel_consumption_liters": total_fuel,
-        "total_unmet_load_kwh": total_unmet,
-        "lolp": lolp,
-        "renewable_fraction": rf,
-        "capacity_shortage_hours": capacity_shortage_hours,
-        "battery_soh_pct": battery_soh,
-        "battery_remaining_capacity_kwh": battery_remaining_capacity,
-        "battery_total_throughput_kwh": battery_throughput
-    }
 
     return hourly_df, summary_stats
 

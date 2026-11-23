@@ -114,6 +114,11 @@ TRANSLATIONS = {
         "chart_hourly_y": "Puissance (kW)",
         "chart_hourly_x": "Date & Heure",
         "chart_share_title": "Répartition de la Production d'Énergie Annuelle (MWh)",
+        "export_report_btn": "Exporter Rapport (HTML/PDF)",
+        "export_report_title": "Enregistrer le Rapport d'Ingénierie HRES",
+        "export_report_success": "Rapport d'ingénierie exporté avec succès !\n\nFichier : {path}\n\nUtilisez Ctrl+P dans le navigateur pour l'enregistrer en PDF.",
+        "export_report_error": "Impossible de générer le rapport d'ingénierie.",
+        "export_report_no_data": "Aucun résultat de simulation disponible. Lancez d'abord une simulation ou une optimisation.",
         
         # Tab 4: Scenario Comparison
         "tab4_title": "Comparateur et Gestionnaire de Scénarios Électriques",
@@ -307,6 +312,11 @@ TRANSLATIONS = {
         "chart_hourly_y": "Power (kW)",
         "chart_hourly_x": "Date & Hour",
         "chart_share_title": "Annual Generation Share breakdown (MWh)",
+        "export_report_btn": "Export Report (HTML/PDF)",
+        "export_report_title": "Save HRES Engineering Report",
+        "export_report_success": "Engineering report exported successfully!\n\nFile: {path}\n\nPress Ctrl+P in your browser to save as PDF.",
+        "export_report_error": "Failed to generate the engineering report.",
+        "export_report_no_data": "No simulation results available. Please run a simulation or optimization first.",
         
         # Tab 4: Scenario Comparison
         "tab4_title": "Electrical Scenario Manager & Comparator",
@@ -500,6 +510,11 @@ TRANSLATIONS = {
         "chart_hourly_y": "القدرة (كيلوواط)",
         "chart_hourly_x": "التاريخ والوقت",
         "chart_share_title": "توزيع إنتاج الطاقة السنوي الإجمالي (ميجاواط ساعة)",
+        "export_report_btn": "تصدير التقرير (HTML/PDF)",
+        "export_report_title": "حفظ التقرير الهندسي لـ HRES",
+        "export_report_success": "تم تصدير التقرير الهندسي بنجاح!\n\nالملف: {path}\n\nاستخدم Ctrl+P في المتصفح لحفظه بصيغة PDF.",
+        "export_report_error": "فشل في إنشاء التقرير الهندسي.",
+        "export_report_no_data": "لا توجد نتائج محاكاة متاحة. يرجى تشغيل المحاكاة أو التحسين أولاً.",
         
         # Tab 4: Scenario Comparison
         "tab4_title": "مقارن ومدير سيناريوهات الشبكة الكهربائية",

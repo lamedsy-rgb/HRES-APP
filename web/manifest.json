@@ -1,0 +1,26 @@
+{
+  "name": "HRES Optimizer — Microgrid Sizing Suite",
+  "short_name": "HRES Optimizer",
+  "description": "8,760-hour Hybrid Renewable Energy System simulation, Genetic Algorithm optimization, and bankable engineering reporting.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09090B",
+  "theme_color": "#09090B",
+  "categories": ["utilities", "productivity", "engineering"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

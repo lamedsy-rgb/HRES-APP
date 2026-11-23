@@ -31,3 +31,6 @@ app_error.log
 *.swp
 .DS_Store
 Thumbs.db
+
+# Scratch scripts
+scratch/

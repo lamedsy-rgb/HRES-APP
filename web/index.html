@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>HRES Optimizer — Rural Microgrid Techno-Economic Sizing Suite</title>
+  <meta name="description" content="8,760-hour Hybrid Renewable Energy System simulation, Genetic Algorithm optimization, and bankable engineering reporting." />
+  <meta name="theme-color" content="#09090B" id="meta-theme-color" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HRES Optimizer" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="alternate icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
+
+  <!-- Typography (graceful offline fallback to Segoe UI / system-ui / Cascadia Mono / Consolas) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet Map (Esri Dark Gray Canvas / World Street Map / Satellite — zero OSM 403) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- ======================================================================
+       TOP NAVIGATION BAR
+       ====================================================================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter">
+          <circle cx="12" cy="12" r="9" opacity="0.35"/>
+          <path d="M13 4L6.5 13h5l-1 7 7-9h-5l.5-7z" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">
+          <span>HRES Optimizer</span>
+          <span class="brand-badge">v2.0</span>
+        </div>
+        <div class="brand-meta-row">
+          <span class="brand-coords mono" id="topbar-coords">NOUAKCHOTT // 18.0735° N, 15.9582° W</span>
+          <span class="brand-sub" data-i18n="brand_sub">Dimensionnement Technico-Économique de Micro-Réseaux (8 760 h)</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav-tabs" role="tablist" aria-label="Main navigation">
+      <button class="nav-tab active" data-tab="data" role="tab" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span data-i18n="tab_data">Données &amp; Carte</span>
+      </button>
+      <button class="nav-tab" data-tab="optimize" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="tab_optimize">Optimisation</span>
+      </button>
+      <button class="nav-tab" data-tab="results" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span data-i18n="tab_results">Résultats &amp; Graphiques</span>
+      </button>
+      <button class="nav-tab" data-tab="compare" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span data-i18n="tab_compare">Comparatif</span>
+      </button>
+      <button class="nav-tab" data-tab="docs" role="tab" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span data-i18n="tab_docs">Aide &amp; Doc</span>
+      </button>
+    </nav>
+
+    <div class="topbar-controls">
+      <div class="status-pill" id="api-status-pill" title="Backend engine status">
+        <span class="status-dot"></span>
+        <span id="api-status-text">FastNumPy 8760h</span>
+      </div>
+
+      <div class="lang-switcher" role="group" aria-label="Language selector">
+        <button class="lang-btn active" data-lang="fr">FR</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="ar">AR</button>
+      </div>
+
+      <button class="icon-btn" id="theme-toggle-btn" title="Toggle Dark / Light theme" aria-label="Toggle theme">
+        <svg id="theme-icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="theme-icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================================================================
+       MAIN APPLICATION WORKSPACE
+       ====================================================================== -->
+  <main class="app-main">
+    <!-- ====================================================================
+         TAB 1: DONNÉES & CARTE
+         ==================================================================== -->
+    <section id="tab-data" class="tab-panel active">
+      <div class="grid-data">
+        <!-- LEFT CONTROLS COLUMN -->
+        <div class="stack">
+          <!-- Site & Weather Source -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_site_title">Site &amp; Données Météorologiques</h2>
+                <p class="card-subtitle" data-i18n="card_site_sub">Cliquez sur la carte ou choisissez une ville de référence</p>
+              </div>
+            </div>
+
+            <span class="section-label" data-i18n="quick_cities">Villes de référence</span>
+            <div class="pill-group" id="city-pills" style="margin-bottom: 12px;">
+              <button class="pill active" data-lat="18.0735" data-lon="-15.9582" data-name="Nouakchott, Mauritania">Nouakchott</button>
+              <button class="pill" data-lat="14.7167" data-lon="-17.4677" data-name="Dakar, Senegal">Dakar</button>
+              <button class="pill" data-lat="32.2359" data-lon="-7.9538" data-name="Benguerir, Morocco">Benguerir</button>
+              <button class="pill" data-lat="24.4539" data-lon="54.3773" data-name="Abu Dhabi, UAE">Abu Dhabi</button>
+              <button class="pill" data-lat="43.2965" data-lon="5.3698" data-name="Marseille, France">Marseille</button>
+            </div>
+
+            <div class="form-grid" style="margin-bottom: 10px;">
+              <div class="field" style="grid-column: span 2;">
+                <label for="input-site-name" data-i18n="lbl_site_name">Nom du site / Projet</label>
+                <input id="input-site-name" class="input" type="text" value="Nouakchott, Mauritania" />
+              </div>
+              <div class="field">
+                <label for="input-lat" data-i18n="lbl_lat">Latitude (°N)</label>
+                <input id="input-lat" class="input mono" type="number" step="0.0001" value="18.0735" />
+              </div>
+              <div class="field">
+                <label for="input-lon" data-i18n="lbl_lon">Longitude (°E)</label>
+                <input id="input-lon" class="input mono" type="number" step="0.0001" value="-15.9582" />
+              </div>
+            </div>
+
+            <div class="form-grid" style="margin-bottom: 12px;">
+              <div class="field">
+                <label for="input-year" data-i18n="lbl_year">Année Météo</label>
+                <input id="input-year" class="input mono" type="number" min="2005" max="2025" value="2023" />
+              </div>
+              <div class="field">
+                <label for="select-weather-source" data-i18n="lbl_weather_src">Source Météo (8 760 h)</label>
+                <select id="select-weather-source" class="select">
+                  <option value="synthetic" data-i18n="src_synthetic">Synthétique Offline (Instantané)</option>
+                  <option value="nasa" data-i18n="src_nasa">NASA POWER API (Cache + Live)</option>
+                </select>
+              </div>
+            </div>
+
+            <button class="btn btn-secondary btn-block" id="btn-refresh-weather" style="margin-bottom: 8px;">
+              <span data-i18n="btn_fetch_weather">Charger / Actualiser les Données Météo</span>
+            </button>
+
+            <!-- Custom CSV/Excel Weather Upload -->
+            <div class="dropzone" id="weather-dropzone">
+              <input type="file" id="weather-file-input" accept=".csv,.xlsx,.xls" hidden />
+              <div class="dropzone-title" data-i18n="upload_title">Importer un fichier météo personnalisé (CSV / Excel)</div>
+              <div class="dropzone-sub" data-i18n="upload_sub">Colonnes requises : solar_irradiance, temperature, wind_speed (8 760 lignes)</div>
+            </div>
+            <div id="upload-status-badge" class="upload-badge" style="display:none;">
+              <span id="upload-status-text"></span>
+              <button class="btn btn-danger-ghost" id="btn-clear-upload" title="Clear custom file">✕</button>
+            </div>
+          </div>
+
+          <!-- Community Load Builder -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_load_title">Profil de Demande Communautaire</h2>
+                <p class="card-subtitle" data-i18n="card_load_sub">Synthèse horaire résidentielle, scolaire et clinique 24/7</p>
+              </div>
+            </div>
+
+            <span class="section-label" data-i18n="community_presets">Préréglages Communautaires</span>
+            <div class="pill-group" id="community-presets" style="margin-bottom: 12px;">
+              <button class="pill" data-preset="hamlet" data-i18n="preset_hamlet">Hameau (15)</button>
+              <button class="pill active" data-preset="village" data-i18n="preset_village">Village (60)</button>
+              <button class="pill" data-preset="center" data-i18n="preset_center">Centre (250)</button>
+            </div>
+
+            <div class="slider-block">
+              <div class="slider-header">
+                <label for="slider-households" data-i18n="lbl_households">Ménages (Foyers)</label>
+                <span class="slider-val" id="val-households">60</span>
+              </div>
+              <input id="slider-households" type="range" min="5" max="500" step="5" value="60" />
+            </div>
+
+            <div class="form-grid" style="margin-top: 10px;">
+              <div class="field">
+                <label for="select-school" data-i18n="lbl_school">École</label>
+                <select id="select-school" class="select">
+                  <option value="none" data-i18n="opt_none">Aucune</option>
+                  <option value="small" data-i18n="opt_small">Petite</option>
+                  <option value="medium" selected data-i18n="opt_medium">Moyenne</option>
+                  <option value="large" data-i18n="opt_large">Grande</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="select-clinic" data-i18n="lbl_clinic">Clinique / Centre Santé</label>
+                <select id="select-clinic" class="select">
+                  <option value="none" data-i18n="opt_none">Aucune</option>
+                  <option value="small" selected data-i18n="opt_small">Petite</option>
+                  <option value="medium" data-i18n="opt_medium">Moyenne</option>
+                  <option value="large" data-i18n="opt_large">Grande</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial & Techno-Economic Parameters -->
+          <div class="card">
+            <details class="fin-details" open>
+              <summary>
+                <span data-i18n="card_fin_title">Paramètres Financiers &amp; Coûts ($ USD)</span>
+                <span style="font-size:11px;color:var(--text-muted);" data-i18n="toggle_expand">CAPEX / Carburant / Actualisation</span>
+              </summary>
+              <div class="form-grid" style="margin-top: 12px;">
+                <div class="field">
+                  <label for="cost-pv-capex" data-i18n="lbl_pv_capex">CAPEX PV ($/kWp)</label>
+                  <input id="cost-pv-capex" class="input mono" type="number" step="50" value="1000" />
+                </div>
+                <div class="field">
+                  <label for="cost-wind-capex" data-i18n="lbl_wind_capex">CAPEX Éolien ($/kW)</label>
+                  <input id="cost-wind-capex" class="input mono" type="number" step="50" value="1600" />
+                </div>
+                <div class="field">
+                  <label for="cost-bat-capex" data-i18n="lbl_bat_capex">CAPEX Batterie ($/kWh)</label>
+                  <input id="cost-bat-capex" class="input mono" type="number" step="10" value="300" />
+                </div>
+                <div class="field">
+                  <label for="cost-diesel-capex" data-i18n="lbl_diesel_capex">CAPEX Diesel ($/kW)</label>
+                  <input id="cost-diesel-capex" class="input mono" type="number" step="20" value="400" />
+                </div>
+                <div class="field">
+                  <label for="cost-fuel-price" data-i18n="lbl_fuel_price">Prix Carburant ($/L)</label>
+                  <input id="cost-fuel-price" class="input mono" type="number" step="0.05" value="1.30" />
+                </div>
+                <div class="field">
+                  <label for="cost-discount-rate" data-i18n="lbl_discount">Taux d'Actualisation (%)</label>
+                  <input id="cost-discount-rate" class="input mono" type="number" step="0.5" value="8.0" />
+                </div>
+                <div class="field">
+                  <label for="cost-lifetime" data-i18n="lbl_lifetime">Durée du Projet (ans)</label>
+                  <input id="cost-lifetime" class="input mono" type="number" min="5" max="40" value="25" />
+                </div>
+                <div class="field" style="justify-content: flex-end;">
+                  <button class="btn btn-ghost" id="btn-reset-costs" style="margin-top: auto;" data-i18n="btn_reset_costs">Réinitialiser</button>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- RIGHT MAP & PREVIEW COLUMN -->
+        <div class="stack">
+          <!-- Interactive Leaflet Map -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_map_title">Carte Interactive &amp; Ressources du Site</h2>
+                <p class="card-subtitle" id="map-source-subtitle">Nouakchott, Mauritania · 18.0735°N, -15.9582°E</p>
+              </div>
+              <span class="brand-badge" id="weather-source-pill">SYNTHETIC 8760H</span>
+            </div>
+
+            <div class="map-wrapper">
+              <div class="map-layer-bar" role="group" aria-label="Map tile layers">
+                <button class="map-layer-btn active" data-layer="dark">Dark</button>
+                <button class="map-layer-btn" data-layer="voyager">Voyager</button>
+                <button class="map-layer-btn" data-layer="satellite">Satellite</button>
+              </div>
+              <div id="leaflet-map"></div>
+            </div>
+
+            <div class="resource-strip">
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="stat_annual_load">Demande Annuelle</div>
+                <div class="mini-stat-val" id="stat-annual-load">-- MWh</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="stat_peak_load">Pic de Charge</div>
+                <div class="mini-stat-val" id="stat-peak-load">-- kW</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="stat_ghi">Irradiation GHI</div>
+                <div class="mini-stat-val" id="stat-ghi">-- kWh/m²/j</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="stat_wind">Vent Moyen (10m)</div>
+                <div class="mini-stat-val" id="stat-wind">-- m/s</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7-Day & Monthly Preview Chart -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_preview_title">Prévisualisation des Profils</h2>
+                <p class="card-subtitle" data-i18n="card_preview_sub">Charge communautaire (7 jours) et potentiel solaire / éolien mensuel</p>
+              </div>
+              <div class="pill-group" id="preview-chart-tabs">
+                <button class="pill active" data-preview="load" data-i18n="prev_load">Charge (7j)</button>
+                <button class="pill" data-preview="solar" data-i18n="prev_solar">Solaire GHI</button>
+                <button class="pill" data-preview="wind" data-i18n="prev_wind">Vent (m/s)</button>
+              </div>
+            </div>
+
+            <div class="chart-box">
+              <canvas id="chart-preview"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible. Les simulations, tableaux et rapports HTML/PDF restent 100 % fonctionnels.</div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top: 14px;">
+              <button class="btn btn-primary" id="btn-goto-optimize">
+                <span data-i18n="btn_goto_opt">Configurer l'Optimisation →</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 2: OPTIMISATION
+         ==================================================================== -->
+    <section id="tab-optimize" class="tab-panel">
+      <div class="grid-optimize">
+        <!-- LEFT: GA Architecture & Parameters -->
+        <div class="stack">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_arch_opt_title">Architecture &amp; Bornes de Recherche</h2>
+                <p class="card-subtitle" data-i18n="card_arch_opt_sub">Activez les technologies à dimensionner par l'Algorithme Génétique</p>
+              </div>
+            </div>
+
+            <div class="stack" style="gap: 10px;">
+              <!-- Solar PV -->
+              <div class="tech-toggle-card enabled" id="card-toggle-pv">
+                <div class="tech-toggle-head">
+                  <div class="tech-name"><span class="tech-dot tech-pv"></span><span data-i18n="tech_pv">Solaire Photovoltaïque (kWp)</span></div>
+                  <label class="switch"><input type="checkbox" id="toggle-pv" checked /><span class="switch-track"></span></label>
+                </div>
+                <div class="form-grid">
+                  <div class="field"><label>Min (kWp)</label><input id="bound-pv-min" class="input mono" type="number" min="0" value="0" /></div>
+                  <div class="field"><label>Max (kWp)</label><input id="bound-pv-max" class="input mono" type="number" min="0" value="250" /></div>
+                </div>
+              </div>
+
+              <!-- Wind Turbine -->
+              <div class="tech-toggle-card enabled" id="card-toggle-wind">
+                <div class="tech-toggle-head">
+                  <div class="tech-name"><span class="tech-dot tech-wind"></span><span data-i18n="tech_wind">Éolien (kW)</span></div>
+                  <label class="switch"><input type="checkbox" id="toggle-wind" checked /><span class="switch-track"></span></label>
+                </div>
+                <div class="form-grid">
+                  <div class="field"><label>Min (kW)</label><input id="bound-wind-min" class="input mono" type="number" min="0" value="0" /></div>
+                  <div class="field"><label>Max (kW)</label><input id="bound-wind-max" class="input mono" type="number" min="0" value="100" /></div>
+                </div>
+              </div>
+
+              <!-- Battery Storage -->
+              <div class="tech-toggle-card enabled" id="card-toggle-battery">
+                <div class="tech-toggle-head">
+                  <div class="tech-name"><span class="tech-dot tech-bat"></span><span data-i18n="tech_bat">Stockage Batterie BESS (kWh)</span></div>
+                  <label class="switch"><input type="checkbox" id="toggle-battery" checked /><span class="switch-track"></span></label>
+                </div>
+                <div class="form-grid">
+                  <div class="field"><label>Min (kWh)</label><input id="bound-bat-min" class="input mono" type="number" min="0" value="0" /></div>
+                  <div class="field"><label>Max (kWh)</label><input id="bound-bat-max" class="input mono" type="number" min="0" value="600" /></div>
+                </div>
+              </div>
+
+              <!-- Diesel Generator -->
+              <div class="tech-toggle-card enabled" id="card-toggle-diesel">
+                <div class="tech-toggle-head">
+                  <div class="tech-name"><span class="tech-dot tech-diesel"></span><span data-i18n="tech_diesel">Groupe Diesel d'Appoint (kW)</span></div>
+                  <label class="switch"><input type="checkbox" id="toggle-diesel" checked /><span class="switch-track"></span></label>
+                </div>
+                <div class="form-grid">
+                  <div class="field"><label>Min (kW)</label><input id="bound-diesel-min" class="input mono" type="number" min="0" value="0" /></div>
+                  <div class="field"><label>Max (kW)</label><input id="bound-diesel-max" class="input mono" type="number" min="0" value="60" /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_ga_params">Paramètres de l'Algorithme Génétique</h2>
+              </div>
+            </div>
+
+            <span class="section-label" data-i18n="ga_mode_lbl">Mode d'Exécution</span>
+            <div class="pill-group" id="ga-mode-pills" style="margin-bottom: 12px;">
+              <button class="pill" data-mode="quick" data-gens="10" data-pop="12" data-i18n="mode_quick">Démo Rapide (~1s)</button>
+              <button class="pill active" data-mode="balanced" data-gens="25" data-pop="16" data-i18n="mode_balanced">Équilibré (~3s)</button>
+              <button class="pill" data-mode="precision" data-gens="45" data-pop="22" data-i18n="mode_precision">Haute Précision (~8s)</button>
+            </div>
+
+            <div class="form-grid" style="margin-bottom: 10px;">
+              <div class="field">
+                <label for="input-ga-gens" data-i18n="lbl_gens">Générations</label>
+                <input id="input-ga-gens" class="input mono" type="number" min="2" max="150" value="25" />
+              </div>
+              <div class="field">
+                <label for="input-ga-pop" data-i18n="lbl_pop">Taille Population</label>
+                <input id="input-ga-pop" class="input mono" type="number" min="4" max="80" value="16" />
+              </div>
+            </div>
+
+            <div class="slider-block">
+              <div class="slider-header">
+                <label for="slider-lolp" data-i18n="lbl_lolp_max">Contrainte Fiabilité — LOLP Max</label>
+                <span class="slider-val" id="val-lolp">1.0%</span>
+              </div>
+              <input id="slider-lolp" type="range" min="0" max="10" step="0.5" value="1.0" />
+            </div>
+
+            <button class="btn btn-primary btn-lg btn-block" id="btn-run-optimize" style="margin-top: 14px;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span data-i18n="btn_run_opt">Lancer l'Optimisation GA (8 760 h)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RIGHT: Live Progress + Manual Simulation -->
+        <div class="stack">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_live_opt">Suivi &amp; Convergence en Temps Réel</h2>
+                <p class="card-subtitle" id="opt-status-desc" data-i18n="opt_ready_desc">Prêt à optimiser la taille optimale pour minimiser le LCOE</p>
+              </div>
+              <span class="brand-badge" id="opt-state-badge">READY</span>
+            </div>
+
+            <div class="resource-strip" style="margin-top: 0; margin-bottom: 12px;">
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="lbl_progress">Avancement</div>
+                <div class="mini-stat-val" id="opt-progress-text">0%</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="lbl_gen_curr">Génération</div>
+                <div class="mini-stat-val" id="opt-gen-text">0 / 25</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="lbl_best_lcoe">Meilleur LCOE</div>
+                <div class="mini-stat-val val-accent" id="opt-best-lcoe">--</div>
+              </div>
+              <div class="mini-stat">
+                <div class="mini-stat-label" data-i18n="lbl_elapsed">Temps écoulé</div>
+                <div class="mini-stat-val" id="opt-elapsed-text">0.0s</div>
+              </div>
+            </div>
+
+            <div class="progress-track" style="margin-bottom: 14px;">
+              <div class="progress-fill" id="opt-progress-bar"></div>
+            </div>
+
+            <div class="chart-box-sm" style="margin-bottom: 14px;">
+              <canvas id="chart-convergence"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+
+            <span class="section-label" data-i18n="lbl_console">Journal d'Exécution</span>
+            <div class="console-box" id="opt-console">HRES FastNumPy Engine ready. Select bounds &amp; launch optimization or manual simulation.</div>
+          </div>
+
+          <!-- Manual What-If Simulator -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="card_manual_title">Simulation Manuelle Instantanée (What-If)</h2>
+                <p class="card-subtitle" data-i18n="card_manual_sub">Testez instantanément une architecture personnalisée sur 8 760 heures (&lt; 50 ms)</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="manual-pv" data-i18n="tech_pv">Solaire PV (kWp)</label>
+                <input id="manual-pv" class="input mono" type="number" min="0" step="5" value="125" />
+              </div>
+              <div class="field">
+                <label for="manual-wind" data-i18n="tech_wind">Éolien (kW)</label>
+                <input id="manual-wind" class="input mono" type="number" min="0" step="1" value="5" />
+              </div>
+              <div class="field">
+                <label for="manual-battery" data-i18n="tech_bat">Batterie BESS (kWh)</label>
+                <input id="manual-battery" class="input mono" type="number" min="0" step="10" value="330" />
+              </div>
+              <div class="field">
+                <label for="manual-diesel" data-i18n="tech_diesel">Diesel (kW)</label>
+                <input id="manual-diesel" class="input mono" type="number" min="0" step="1" value="12" />
+              </div>
+            </div>
+
+            <button class="btn btn-emerald btn-block" id="btn-run-manual" style="margin-top: 14px;">
+              <span data-i18n="btn_run_manual">Simuler cette Configuration Instantanément</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 3: RÉSULTATS & GRAPHIQUES
+         ==================================================================== -->
+    <section id="tab-results" class="tab-panel">
+      <div class="stack">
+        <!-- Results Action Toolbar -->
+        <div class="results-toolbar">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <strong id="res-site-heading" style="font-size:15px;">Nouakchott, Mauritania</strong>
+              <span class="brand-badge" id="res-method-badge">Initial Simulation</span>
+            </div>
+            <div class="card-subtitle" id="res-meta-subtitle">8,760h chronological simulation</div>
+          </div>
+
+          <div class="toolbar-group">
+            <input id="input-scenario-name" class="input scenario-name-input" type="text" placeholder="Nom du scénario..." />
+            <button class="btn btn-secondary" id="btn-save-scenario">
+              <span data-i18n="btn_save_scenario">Enregistrer Scénario</span>
+            </button>
+            <button class="btn btn-export" id="btn-export-report">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span data-i18n="btn_export_report">Exporter Rapport Bancable (PDF/HTML)</span>
+            </button>
+            <button class="btn btn-ghost" id="btn-download-report" title="Download standalone HTML report">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 8 KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-highlight">
+            <div class="kpi-label" data-i18n="kpi_lcoe">LCOE (Coût Actualisé)</div>
+            <div class="kpi-value" id="kpi-lcoe">--</div>
+            <div class="kpi-sub" id="kpi-lcoe-sub">USD / kWh desservi</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" data-i18n="kpi_npc">Coût Net Actuel (NPC)</div>
+            <div class="kpi-value" id="kpi-npc">--</div>
+            <div class="kpi-sub" id="kpi-npc-sub">Cycle de vie 25 ans</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" data-i18n="kpi_capex">Investissement (CAPEX)</div>
+            <div class="kpi-value" id="kpi-capex">--</div>
+            <div class="kpi-sub" id="kpi-opex-sub">OPEX: -- /an</div>
+          </div>
+          <div class="kpi-card kpi-positive">
+            <div class="kpi-label" data-i18n="kpi_rf">Fraction Renouvelable</div>
+            <div class="kpi-value" id="kpi-rf">--</div>
+            <div class="kpi-sub" id="kpi-rf-sub">Part solaire + éolien</div>
+          </div>
+          <div class="kpi-card kpi-positive">
+            <div class="kpi-label" data-i18n="kpi_lolp">Fiabilité / LOLP</div>
+            <div class="kpi-value" id="kpi-reliability">--</div>
+            <div class="kpi-sub" id="kpi-lolp-sub">LOLP: -- · -- h déficit</div>
+          </div>
+          <div class="kpi-card kpi-alert">
+            <div class="kpi-label" data-i18n="kpi_fuel">Carburant Diesel Annuel</div>
+            <div class="kpi-value" id="kpi-fuel">--</div>
+            <div class="kpi-sub" id="kpi-fuel-sub">-- h/an · $--/an</div>
+          </div>
+          <div class="kpi-card kpi-positive">
+            <div class="kpi-label" data-i18n="kpi_co2">CO₂ Évité par An</div>
+            <div class="kpi-value" id="kpi-co2">--</div>
+            <div class="kpi-sub" id="kpi-co2-sub">Cycle de vie: -- tCO₂</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" data-i18n="kpi_soh">Santé Batterie (SOH An 1)</div>
+            <div class="kpi-value" id="kpi-soh">--</div>
+            <div class="kpi-sub" id="kpi-soh-sub">Vieillissement cyclique</div>
+          </div>
+        </div>
+
+        <!-- Optimal Sizing Architecture Breakdown -->
+        <div class="grid-4" id="sizing-cards-row">
+          <div class="arch-card">
+            <div class="kpi-label" data-i18n="arch_pv">Solaire PV</div>
+            <div class="kpi-value arch-val arch-pv" id="arch-pv-val">-- kWp</div>
+            <div class="kpi-sub" id="arch-pv-sub">CAPEX: --</div>
+            <div class="arch-bar-track"><div class="arch-bar-fill arch-pv" id="arch-pv-bar" style="width:0%;"></div></div>
+          </div>
+          <div class="arch-card">
+            <div class="kpi-label" data-i18n="arch_wind">Éolien</div>
+            <div class="kpi-value arch-val arch-wind" id="arch-wind-val">-- kW</div>
+            <div class="kpi-sub" id="arch-wind-sub">CAPEX: --</div>
+            <div class="arch-bar-track"><div class="arch-bar-fill arch-wind" id="arch-wind-bar" style="width:0%;"></div></div>
+          </div>
+          <div class="arch-card">
+            <div class="kpi-label" data-i18n="arch_bat">Stockage Batterie (BESS)</div>
+            <div class="kpi-value arch-val arch-bat" id="arch-bat-val">-- kWh</div>
+            <div class="kpi-sub" id="arch-bat-sub">CAPEX: --</div>
+            <div class="arch-bar-track"><div class="arch-bar-fill arch-bat" id="arch-bat-bar" style="width:0%;"></div></div>
+          </div>
+          <div class="arch-card">
+            <div class="kpi-label" data-i18n="arch_diesel">Groupe Diesel</div>
+            <div class="kpi-value arch-val arch-diesel" id="arch-diesel-val">-- kW</div>
+            <div class="kpi-sub" id="arch-diesel-sub">CAPEX: --</div>
+            <div class="arch-bar-track"><div class="arch-bar-fill arch-diesel" id="arch-diesel-bar" style="width:0%;"></div></div>
+          </div>
+        </div>
+
+        <!-- Interactive Week 1-52 Dispatch & Battery SOC + Rehoboam Energy Mix Ring -->
+        <div class="grid-results-hero">
+          <div class="card card-telemetry">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="chart_dispatch_title">Dispatch Horaire (168 h) &amp; État de Charge Batterie (SOC)</h2>
+                <p class="card-subtitle" data-i18n="chart_dispatch_sub">Explorez n'importe quelle semaine de l'année (Semaine 1 à 52)</p>
+              </div>
+              <div class="pill-group" id="season-pills">
+                <button class="pill" data-week="3" data-i18n="season_winter">Hiver (S3)</button>
+                <button class="pill" data-week="15" data-i18n="season_spring">Printemps (S15)</button>
+                <button class="pill active" data-week="24" data-i18n="season_summer">Été (S24)</button>
+                <button class="pill" data-week="42" data-i18n="season_autumn">Automne (S42)</button>
+              </div>
+            </div>
+
+            <div class="week-controls">
+              <button class="btn btn-ghost" id="btn-week-prev" style="padding:5px 10px;">◀</button>
+              <span class="slider-val" id="week-badge">Week 24 · Jun 11 – Jun 17</span>
+              <div class="week-slider-wrap">
+                <input id="slider-week" type="range" min="1" max="52" step="1" value="24" />
+              </div>
+              <button class="btn btn-ghost" id="btn-week-next" style="padding:5px 10px;">▶</button>
+            </div>
+
+            <div class="chart-box-lg">
+              <canvas id="chart-dispatch"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+          </div>
+
+          <!-- Signature Concentric Radial Energy Mix Telemetry Card -->
+          <div class="card card-telemetry energy-mix-card" id="energy-mix-card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="mix_card_title">Mix Énergétique</h2>
+                <p class="card-subtitle" data-i18n="mix_card_sub">Répartition annuelle &amp; fraction renouvelable</p>
+              </div>
+            </div>
+
+            <div class="rehoboam-ring-wrap">
+              <svg class="rehoboam-ring-svg" viewBox="0 0 240 240" aria-label="Energy Mix Radial Telemetry">
+                <g transform="rotate(-90 120 120)">
+                  <!-- Outer Track & Arc: Solar PV (r=98, C=615.75) -->
+                  <circle class="ring-track" cx="120" cy="120" r="98" stroke-width="5"/>
+                  <circle class="ring-arc ring-pv" id="ring-pv" cx="120" cy="120" r="98" stroke-width="5.5" stroke-dasharray="615.75" stroke-dashoffset="615.75"/>
+                  <!-- 2nd Track & Arc: BESS Shifted (r=84, C=527.79) -->
+                  <circle class="ring-track" cx="120" cy="120" r="84" stroke-width="4.5"/>
+                  <circle class="ring-arc ring-bess" id="ring-bess" cx="120" cy="120" r="84" stroke-width="4.8" stroke-dasharray="527.79" stroke-dashoffset="527.79"/>
+                  <!-- 3rd Track & Arc: Wind (r=71, C=446.11) -->
+                  <circle class="ring-track" cx="120" cy="120" r="71" stroke-width="3.5"/>
+                  <circle class="ring-arc ring-wind" id="ring-wind" cx="120" cy="120" r="71" stroke-width="3.8" stroke-dasharray="446.11" stroke-dashoffset="446.11"/>
+                  <!-- Inner Track & Arc: Diesel Backup (r=59, C=370.71) -->
+                  <circle class="ring-track" cx="120" cy="120" r="59" stroke-width="3.5"/>
+                  <circle class="ring-arc ring-diesel" id="ring-diesel" cx="120" cy="120" r="59" stroke-width="3.8" stroke-dasharray="370.71" stroke-dashoffset="370.71"/>
+                </g>
+              </svg>
+              <div class="rehoboam-ring-center">
+                <div class="rehoboam-rf-val" id="mix-rf-center">--%</div>
+                <div class="rehoboam-rf-lbl" data-i18n="mix_ring_label">ENERGY MIX</div>
+              </div>
+            </div>
+
+            <div class="mix-legend">
+              <div class="mix-legend-row">
+                <span class="mix-legend-key"><span class="mix-dash mix-pv"></span><span data-i18n="mix_solar">SOLAR PV</span></span>
+                <span class="mix-legend-val mono" id="mix-pct-pv">--%</span>
+              </div>
+              <div class="mix-legend-row">
+                <span class="mix-legend-key"><span class="mix-dash mix-bess"></span><span data-i18n="mix_bess">BESS SHIFTED</span></span>
+                <span class="mix-legend-val mono" id="mix-pct-bess">--%</span>
+              </div>
+              <div class="mix-legend-row">
+                <span class="mix-legend-key"><span class="mix-dash mix-wind"></span><span data-i18n="mix_wind">WIND TURBINE</span></span>
+                <span class="mix-legend-val mono" id="mix-pct-wind">--%</span>
+              </div>
+              <div class="mix-legend-row">
+                <span class="mix-legend-key"><span class="mix-dash mix-diesel"></span><span data-i18n="mix_diesel">DIESEL BACKUP</span></span>
+                <span class="mix-legend-val mono" id="mix-pct-diesel">--%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Generation Mix & Lifecycle Cost Breakdown -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="chart_monthly_title">Production Mensuelle vs. Demande (MWh)</h2>
+                <p class="card-subtitle" data-i18n="chart_monthly_sub">Bilan énergétique agrégé sur 12 mois</p>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-monthly"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title" data-i18n="chart_cost_title">Décomposition du NPC &amp; CAPEX ($)</h2>
+                <p class="card-subtitle" data-i18n="chart_cost_sub">Flux actualisés sur la durée de vie du projet</p>
+              </div>
+              <div class="pill-group" id="cost-chart-mode">
+                <button class="pill active" data-costview="npc" data-i18n="cost_view_npc">NPC Cycle de Vie</button>
+                <button class="pill" data-costview="capex" data-i18n="cost_view_capex">CAPEX Initial</button>
+              </div>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-cost"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Energy & Cash-Flow Summary Table (100% offline readable) -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title" data-i18n="tbl_energy_title">Bilan Énergétique Annuel</h2>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="col_metric">Indicateur</th>
+                    <th class="num" data-i18n="col_value">Valeur</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-energy-summary"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title" data-i18n="tbl_fin_title">Synthèse Financière Actualisée (NPC)</h2>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="col_cost_item">Poste Financier</th>
+                    <th class="num" data-i18n="col_usd">Montant ($ USD)</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-fin-summary"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 4: COMPARATIF DE SCÉNARIOS
+         ==================================================================== -->
+    <section id="tab-compare" class="tab-panel">
+      <div class="stack">
+        <div class="results-toolbar">
+          <div>
+            <h2 class="card-title" data-i18n="cmp_title">Comparatif Multi-Scénarios</h2>
+            <p class="card-subtitle" data-i18n="cmp_sub">Comparez vos architectures enregistrées (ex. 100 % Diesel vs. Solaire+BESS vs. Hybride)</p>
+          </div>
+          <div class="toolbar-group">
+            <button class="btn btn-primary" id="btn-gen-benchmarks">
+              <span data-i18n="btn_gen_benchmarks">Générer 3 Scénarios de Référence</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-export-csv">
+              <span data-i18n="btn_export_csv">Exporter CSV</span>
+            </button>
+            <button class="btn btn-ghost" id="btn-clear-scenarios">
+              <span data-i18n="btn_clear_all">Tout Effacer</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th data-i18n="cmp_col_name">Scénario</th>
+                  <th class="num">PV (kWp)</th>
+                  <th class="num" data-i18n="cmp_col_wind">Éolien (kW)</th>
+                  <th class="num" data-i18n="cmp_col_bat">BESS (kWh)</th>
+                  <th class="num">Diesel (kW)</th>
+                  <th class="num">LCOE ($/kWh)</th>
+                  <th class="num">NPC ($)</th>
+                  <th class="num">CAPEX ($)</th>
+                  <th class="num">RF (%)</th>
+                  <th class="num">LOLP (%)</th>
+                  <th class="num" data-i18n="cmp_col_co2">CO₂ Évité (t/an)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tbody-scenarios"></tbody>
+            </table>
+          </div>
+          <div id="cmp-empty-state" style="text-align:center; padding: 28px 16px; color: var(--text-secondary); display:none;">
+            <p data-i18n="cmp_empty">Aucun scénario enregistré. Enregistrez un résultat depuis l'onglet Résultats ou générez les 3 benchmarks automatiques.</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title" data-i18n="cmp_chart_lcoe">Comparaison LCOE ($/kWh) &amp; Fraction Renouvelable (%)</h2>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-cmp-lcoe"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title" data-i18n="cmp_chart_npc">Comparaison NPC vs. CAPEX Initial (k$)</h2>
+            </div>
+            <div class="chart-box">
+              <canvas id="chart-cmp-npc"></canvas>
+              <div class="chart-offline-msg" data-i18n="chart_offline_msg">Mode hors-ligne : Chart.js indisponible.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 5: AIDE & DOCUMENTATION D'INGÉNIERIE
+         ==================================================================== -->
+    <section id="tab-docs" class="tab-panel">
+      <div class="stack">
+        <div class="card">
+          <h2 class="card-title" data-i18n="doc_header_title">Modèles Physiques, Dispatch EMS &amp; Équations Financières</h2>
+          <p class="card-subtitle" data-i18n="doc_header_sub">Toutes les simulations sont exécutées chronologiquement heure par heure (8 760 pas de temps par an).</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_pv_title">1. Modèle Solaire Photovoltaïque (PV)</h3>
+            <p data-i18n="doc_pv_desc">Intègre la température de cellule (NOCT) et le coefficient de dégradation thermique des modules sous irradiance horaire G (kW/m²).</p>
+            <div class="eq-box">
+              T_cell = T_amb + (G / 0.8) × (NOCT − 20)<br/>
+              P_PV(t) = max(0, P_rated × f_derating × G(t) × [1 + α_P × (T_cell − 25)])
+            </div>
+            <ul class="doc-vars">
+              <li><code>NOCT = 45 °C</code> · <code>f_derating = 0.82</code> · <code>α_P = -0.004 /°C</code></li>
+            </ul>
+          </div>
+
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_wind_title">2. Modèle Éolien (Loi de Cisaillement &amp; Courbe Cubique)</h3>
+            <p data-i18n="doc_wind_desc">Extrapole la vitesse du vent mesurée à 10 m vers la hauteur de moyeu (50 m), puis applique une courbe de puissance cubique par morceaux.</p>
+            <div class="eq-box">
+              V_hub = V_anem × (H_hub / H_anem)^α<br/>
+              P_wind = P_rated × ((V_hub − V_ci) / (V_r − V_ci))³ &nbsp; [V_ci ≤ V_hub &lt; V_r]
+            </div>
+            <ul class="doc-vars">
+              <li><code>H_anem = 10 m</code> · <code>H_hub = 50 m</code> · <code>α = 0.14</code> · <code>V_ci = 3 m/s</code> · <code>V_r = 12 m/s</code> · <code>V_co = 25 m/s</code></li>
+            </ul>
+          </div>
+
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_bat_title">3. Stockage Batterie (BESS) — SOC &amp; Vieillissement SOH</h3>
+            <p data-i18n="doc_bat_desc">Suit l'état de charge (20 %–100 %), les rendements de charge/décharge, les limites de taux C (0.5 C), l'autodécharge horaire et la perte de capacité cyclique.</p>
+            <div class="eq-box">
+              E_stored(t+1) = E_stored(t) − σ·C_curr + η_ch·E_ch − E_dis / η_dis<br/>
+              SOH(t) = max(0, 1 − Q_throughput(t) / (N_cycles × C_nom)) × 100%
+            </div>
+            <ul class="doc-vars">
+              <li><code>SOC ∈ [20%, 100%]</code> · <code>η_ch = η_dis = 96%</code> · <code>C-rate = 0.5C</code> · <code>N_cycles = 3,000</code></li>
+            </ul>
+          </div>
+
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_diesel_title">4. Groupe Diesel d'Appoint &amp; Règle de Charge Minimale</h3>
+            <p data-i18n="doc_diesel_desc">Courbe linéaire de consommation de Willans avec plancher de charge à 30 % pour éviter le glaçage moteur ; tout surplus recharge la batterie.</p>
+            <div class="eq-box">
+              Fuel(t) = F₀ × P_rated + F₁ × P_gen(t) &nbsp;&nbsp;(P_gen &gt; 0)<br/>
+              P_gen(t) ≥ 0.30 × P_rated &nbsp;|&nbsp; CO₂ = Fuel × 2.68 kg/L (IPCC)
+            </div>
+            <ul class="doc-vars">
+              <li><code>F₀ = 0.08 L/h/kW</code> · <code>F₁ = 0.25 L/kWh</code> · <code>Baseline 100% Diesel = 0.32 L/kWh</code></li>
+            </ul>
+          </div>
+
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_fin_title">5. Analyse Financière (NPC, CRF, LCOE) &amp; Fiabilité</h3>
+            <p data-i18n="doc_fin_desc">Actualise l'ensemble des flux (investissement initial, maintenance fixe, carburant, remplacements périodiques et valeur résiduelle) sur la durée du projet.</p>
+            <div class="eq-box">
+              NPC = CAPEX + OPEX_disc + Fuel_disc + Repl_disc − Salvage_disc<br/>
+              CRF(d, N) = [d(1+d)^N] / [(1+d)^N − 1] &nbsp;|&nbsp; LCOE = (NPC × CRF) / E_served<br/>
+              LOLP = E_unmet / E_load &nbsp;|&nbsp; RF = 1 − (E_diesel / E_served)
+            </div>
+          </div>
+
+          <div class="card doc-card">
+            <h3 class="card-title" data-i18n="doc_csv_title">6. Format des Fichiers Météo Personnalisés (CSV / Excel)</h3>
+            <p data-i18n="doc_csv_desc">Importez facilement vos propres mesures météorologiques (ou un export NASA POWER / PVGIS) depuis l'onglet Données &amp; Carte :</p>
+            <div class="eq-box">
+              solar_irradiance,temperature,wind_speed<br/>
+              0.000,21.4,4.2<br/>
+              0.485,26.8,5.1<br/>
+              ... (8,760 hourly rows — auto W/m² → kW/m²)
+            </div>
+            <ul class="doc-vars">
+              <li><span data-i18n="doc_csv_note">Les années bissextiles (8 784 lignes) et délimiteurs point-virgule (;) sont automatiquement normalisés.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- External Libraries (graceful offline fallback built into app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

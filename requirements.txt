@@ -8,3 +8,7 @@ openpyxl
 pyinstaller
 tkintermapview
 pillow
+fastapi
+uvicorn[standard]
+python-multipart
+httpx

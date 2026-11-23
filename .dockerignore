@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.git/
+build/
+dist/
+scratch/
+gui/
+examples/
+tests/
+data_handlers/cache/
+*.spec
+*.log
+*.bat
+.tutorial_done

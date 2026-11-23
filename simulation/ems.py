@@ -109,8 +109,8 @@ def dispatch_hour(
                     diesel_power = max_load
                     unmet_load = remaining_deficit - max_load
                     
-                # Calculate fuel consumption
-                diesel_fuel = diesel.calculate_fuel(diesel_power)
+                # Calculate fuel consumption (L/hr * duration_hr = L)
+                diesel_fuel = diesel.calculate_fuel(diesel_power) * duration_hr
             else:
                 # No diesel generator available
                 unmet_load = remaining_deficit

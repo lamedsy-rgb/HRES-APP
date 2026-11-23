@@ -142,14 +142,14 @@ class NASAWeatherDataHandler:
             'wind_speed': [wind_raw[t] for t in timestamps]
         }, index=datetime_idx)
         
-        # NASA hourly irradiance ALLSKY_SFC_SW_DWN is in Wh/m^2.
-        # To convert to kW/m^2 for the hourly interval: Wh/m^2 / 1000 = kW/m^2
-        df['solar_irradiance'] = df['solar_irradiance'] / 1000.0
-        
-        # Clean fill_value / invalid values (NASA uses -999.0 for missing data)
+        # Clean fill_value / invalid values BEFORE unit conversion (NASA uses -999.0 for missing data)
         fill_val = data_json.get('header', {}).get('fill_value', -999.0)
         df[df == fill_val] = np.nan
         df = df.ffill().bfill()  # simple forward/backward fill for missing hours
+
+        # NASA hourly irradiance ALLSKY_SFC_SW_DWN is in Wh/m^2.
+        # To convert to kW/m^2 for the hourly interval: Wh/m^2 / 1000 = kW/m^2
+        df['solar_irradiance'] = df['solar_irradiance'] / 1000.0
         
         # Ensure values are physically bound
         df['solar_irradiance'] = df['solar_irradiance'].clip(lower=0.0)

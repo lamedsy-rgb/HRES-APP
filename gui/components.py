@@ -125,29 +125,35 @@ class LabeledSlider(ctk.CTkFrame):
         app = self.winfo_toplevel()
         is_rtl = hasattr(app, "current_language") and app.current_language == "ar"
         
-        # Configure columns: Label, Slider, Value
-        self.grid_columnconfigure(0, weight=2)
-        self.grid_columnconfigure(1, weight=3)
-        self.grid_columnconfigure(2, weight=1)
+        # Two-row layout: Label + Value on row 0 (no horizontal clipping), full-width Slider on row 1
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
         
         anchor = "e" if is_rtl else "w"
         self.label = ctk.CTkLabel(self, text=label_text, anchor=anchor)
-        self.slider = ctk.CTkSlider(self, from_=from_, to=to, number_of_steps=int((to - from_) / resolution))
+        self.slider = ctk.CTkSlider(self, from_=from_, to=to, number_of_steps=max(1, int((to - from_) / resolution)))
         self.slider.set(default_value)
         self.slider.configure(command=self._on_slider_move)
         
         val_anchor = "w" if is_rtl else "e"
-        self.value_label = ctk.CTkLabel(self, text=f"{default_value}{value_suffix}", width=60, anchor=val_anchor)
+        self.value_label = ctk.CTkLabel(
+            self,
+            text=f"{default_value}{value_suffix}",
+            width=64,
+            anchor=val_anchor,
+            font=ctk.CTkFont(weight="bold")
+        )
         
         # Grid layout based on LTR/RTL
         if is_rtl:
-            self.value_label.grid(row=0, column=0, padx=(5, 10), sticky="ew")
-            self.slider.grid(row=0, column=1, padx=5, sticky="ew")
-            self.label.grid(row=0, column=2, padx=(10, 5), sticky="ew")
+            self.grid_columnconfigure(0, weight=0)
+            self.grid_columnconfigure(1, weight=1)
+            self.value_label.grid(row=0, column=0, padx=(5, 8), pady=(0, 4), sticky="w")
+            self.label.grid(row=0, column=1, padx=(8, 5), pady=(0, 4), sticky="ew")
         else:
-            self.label.grid(row=0, column=0, padx=(5, 10), sticky="ew")
-            self.slider.grid(row=0, column=1, padx=5, sticky="ew")
-            self.value_label.grid(row=0, column=2, padx=(10, 5), sticky="ew")
+            self.label.grid(row=0, column=0, padx=(5, 8), pady=(0, 4), sticky="ew")
+            self.value_label.grid(row=0, column=1, padx=(8, 5), pady=(0, 4), sticky="e")
+        self.slider.grid(row=1, column=0, columnspan=2, padx=5, pady=(0, 2), sticky="ew")
         
     def _on_slider_move(self, val):
         rounded_val = round(float(val) / self.resolution) * self.resolution

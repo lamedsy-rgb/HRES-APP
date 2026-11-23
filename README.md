@@ -6,6 +6,9 @@
 ![Optimization](https://img.shields.io/badge/Optimization-Genetic%20Algorithm%20(PyGAD%20%2F%20NumPy)-1d4ed8)
 ![Reports](https://img.shields.io/badge/Export-1--Click%20Bankable%20HTML%2FPDF-d97706)
 ![Localization](https://img.shields.io/badge/UI%20%26%20Reports-FR%20%7C%20EN%20%7C%20AR-64748b)
+[![Live Demo](https://img.shields.io/badge/Live%20Web%20App-hres--optimizer.onrender.com-D4A359?style=flat)](https://hres-optimizer.onrender.com)
+
+> **Live Interactive Web App (Desktop & Mobile PWA):** **https://hres-optimizer.onrender.com** *(Free Render instance — first wake-up after idle takes ~30–45s)*
 
 **HRES Optimizer** is an offline-capable Python **Web & Desktop engineering suite** (FastAPI + Leaflet + Chart.js + CustomTkinter + FastNumPy) built to design, simulate, and economically optimize **Hybrid Renewable Energy Systems (HRES)** for off-grid rural communities across West Africa and the Sahel.
 
